@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mapa de Calor de Riesgos</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+    font-family:Arial;
+    margin:20px;
+    background:#f2f2f2;
+}
+
+h2{
+    text-align:center;
+}
+
+.contenedor{
+    display:flex;
+    gap:20px;
+}
+
+.panel{
+    width:350px;
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,.2);
+}
+
+.panel input{
+    width:100%;
+    padding:8px;
+    margin-bottom:10px;
+}
+
+button{
+    padding:10px;
+    cursor:pointer;
+    margin-top:5px;
+}
+
+table{
+    width:100%;
+    margin-top:15px;
+    border-collapse:collapse;
+}
+
+th,td{
+    border:1px solid #ccc;
+    padding:6px;
+    text-align:center;
+}
+
+.grafico{
+    flex:1;
+    background:white;
+    border-radius:10px;
+    padding:15px;
+    box-shadow:0 0 10px rgba(0,0,0,.2);
+}
+
+canvas{
+    width:100%;
+    height:700px;
+}
+
+</style>
+
+</head>
+<body>
+
+<h2>MAPA DE CALOR DE RIESGOS</h2>
+
+<div class="contenedor">
+
+<div class="panel">
+
+<label>Nombre del Riesgo</label>
+<input id="nombre">
+
+<label>Probabilidad (0-1 ó 0-100)</label>
+<input id="prob" type="number">
+
+<label>Impacto (0-100)</label>
+<input id="impacto" type="number">
+
+<button onclick="agregar()">Agregar Riesgo</button>
+
+<button onclick="descargar()">Guardar Imagen</button>
+
+<table>
+
+<thead>
+
+<tr>
+<th>Riesgo</th>
+<th>P</th>
+<th>I</th>
+<th></th>
+</tr>
+
+</thead>
+
+<tbody id="tabla"></tbody>
+
+</table>
+
+</div>
+
+<div class="grafico">
+
+<canvas id="grafico"></canvas>
+
+</div>
+
+</div>
+
+<script>
+
+const fondoMapa={
+id:'fondoMapa',
+beforeDraw(chart){
+
+const {ctx,chartArea}=chart;
+
+if(!chartArea)return;
+
+const {left,right,top,bottom,width,height}=chartArea;
+
+const grad=ctx.createLinearGradient(0,bottom,right,top);
+
+grad.addColorStop(0,"#00b050");
+grad.addColorStop(.35,"yellow");
+grad.addColorStop(.70,"orange");
+grad.addColorStop(1,"red");
+
+ctx.save();
+ctx.fillStyle=grad;
+ctx.fillRect(left,top,width,height);
+ctx.restore();
+
+}
+};
+
+const etiquetas={
+id:'etiquetas',
+afterDatasetsDraw(chart){
+
+const {ctx}=chart;
+
+ctx.font="12px Arial";
+ctx.fillStyle="black";
+
+chart.data.datasets[0].data.forEach((p,i)=>{
+
+const meta=chart.getDatasetMeta(0).data[i];
+
+ctx.fillText(p.nombre,
+meta.x+8,
+meta.y-8);
+
+});
+
+}
+};
+
+Chart.register(fondoMapa);
+Chart.register(etiquetas);
+
+const datos=[];
+
+const colores=[
+"#003f5c",
+"#bc5090",
+"#ffa600",
+"#2f4b7c",
+"#665191",
+"#ff6361",
+"#1f77b4",
+"#2ca02c",
+"#9467bd",
+"#000000"
+];
+
+const chart=new Chart(document.getElementById("grafico"),{
+
+type:"scatter",
+
+data:{
+
+datasets:[{
+
+pointRadius:7,
+
+data:[],
+
+backgroundColor:[]
+
+}]
+
+},
+
+options:{
+
+responsive:true,
+
+plugins:{
+legend:false,
+title:{
+display:true,
+text:"Mapa de Calor"
+}
+},
+
+scales:{
+
+x:{
+
+min:0,
+
+max:1,
+
+title:{
+display:true,
+text:"Probabilidad"
+}
+
+},
+
+y:{
+
+min:0,
+
+max:100,
+
+title:{
+display:true,
+text:"Impacto"
+}
+
+}
+
+}
+
+}
+
+});
+
+function actualizar(){
+
+chart.data.datasets[0].data=datos;
+
+chart.data.datasets[0].backgroundColor=datos.map((x,i)=>colores[i%colores.length]);
+
+chart.update();
+
+let html="";
+
+datos.forEach((r,i)=>{
+
+html+=`
+<tr>
+
+<td>${r.nombre}</td>
+
+<td>${r.x.toFixed(2)}</td>
+
+<td>${r.y}</td>
+
+<td>
+<button onclick="eliminar(${i})">X</button>
+</td>
+
+</tr>
+`;
+
+});
+
+tabla.innerHTML=html;
+
+}
+
+function agregar(){
+
+let nombre=document.getElementById("nombre").value;
+
+let p=parseFloat(document.getElementById("prob").value);
+
+let i=parseFloat(document.getElementById("impacto").value);
+
+if(nombre==""){
+alert("Ingrese el nombre");
+return;
+}
+
+if(p>1)
+p=p/100;
+
+datos.push({
+
+x:p,
+y:i,
+nombre:nombre
+
+});
+
+actualizar();
+
+document.getElementById("nombre").value="";
+document.getElementById("prob").value="";
+document.getElementById("impacto").value="";
+
+}
+
+function eliminar(indice){
+
+datos.splice(indice,1);
+
+actualizar();
+
+}
+
+function descargar(){
+
+const a=document.createElement("a");
+
+a.href=chart.toBase64Image();
+
+a.download="MapaCalor.png";
+
+a.click();
+
+}
+
+</script>
+
+</body>
+</html>
+

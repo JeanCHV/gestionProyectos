@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PMO Risk Control - App Taxis Project</title>
+
+<!-- Chart.js para el Mapa de Calor -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root {
+    --bg: #0b0f19;
+    --card-bg: #111827;
+    --primary-text: #f3f4f6;
+    --secondary-text: #9ca3af;
+    --border: #1f2937;
+    --accent: #facc15; /* Amarillo Taxi Corporativo para destacar */
+    --accent-hover: #eab308;
+    
+    /* Estados de Criticidad */
+    --bajo: #00b050;
+    --medio: #eab308;
+    --alto: #f97316;
+    --critico: #ef4444;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--primary-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px;
+    line-height: 1.5;
+}
+
+header {
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+}
+
+header h1 {
+    font-size: 26px;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+header p {
+    font-size: 14px;
+    color: var(--secondary-text);
+}
+
+.project-badge {
+    background-color: #1e293b;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-block;
+    margin-top: 8px;
+}
+
+/* Indicadores / KPIs */
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.kpi-card {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+    border: 1px solid var(--border);
+    border-left: 5px solid #cbd5e1;
+}
+
+.kpi-card.total { border-left-color: var(--accent); }
+.kpi-card.bajo { border-left-color: var(--bajo); }
+.kpi-card.medio { border-left-color: var(--medio); }
+.kpi-card.alto { border-left-color: var(--alto); }
+.kpi-card.critico { border-left-color: var(--critico); }
+
+.kpi-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--secondary-text);
+}
+
+.kpi-value {
+    font-size: 26px;
+    font-weight: 700;
+    margin-top: 4px;
+    color: #ffffff;
+}
+
+/* Diseño Dashboard */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 410px 1fr;
+    gap: 24px;
+}
+
+@media(max-width: 1100px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+}
+
+.card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+}
+
+.card-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 18px;
+    color: #ffffff;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Formularios */
+.form-group {
+    margin-bottom: 14px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--primary-text);
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background-color: #1f2937;
+    color: #ffffff;
+    transition: border-color 0.2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.row-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+/* Botones */
+.btn-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.btn-primary { background: var(--accent); color: #000000; width: 100%; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: #374151; color: #ffffff; border: 1px solid var(--border); }
+.btn-secondary:hover { background: #4b5563; }
+
+/* Gráfico */
+.canvas-container {
+    position: relative;
+    width: 100%;
+    height: 480px;
+}
+
+/* Tabla */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+}
+
+th, td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+th {
+    background-color: #1f2937;
+    font-weight: 700;
+    color: #ffffff;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+tr:hover {
+    background-color: #1f2937;
+}
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+    display: inline-block;
+    text-align: center;
+}
+
+.bg-bajo { background-color: var(--bajo); }
+.bg-medio { background-color: var(--medio); color: #000000; }
+.bg-alto { background-color: var(--alto); }
+.bg-critico { background-color: var(--critico); }
+
+.btn-del {
+    background: #7f1d1d;
+    border: none;
+    color: #fca5a5;
+    cursor: pointer;
+    font-weight: bold;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+.btn-del:hover { background: #b91c1c; }
+
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Matriz de Control y Gestión de Riesgos en Proyectos</h1>
+    <p>Identificación y monitoreo de eventos de riesgo según guías metodológicas de la PMO</p>
+    <div class="project-badge">Proyecto Activo: Desarrollo de Aplicación Móvil para Servicios de Taxi</div>
+</header>
+
+<!-- Dashboard Express del Proyecto -->
+<div class="kpis">
+    <div class="kpi-card total"><div class="kpi-title">Riesgos en Matriz</div><div class="kpi-value" id="kpi-total">0</div></div>
+    <div class="kpi-card bajo"><div class="kpi-title">Exposición Baja</div><div class="kpi-value" id="kpi-bajo" style="color:var(--bajo)">0</div></div>
+    <div class="kpi-card medio"><div class="kpi-title">Exposición Media</div><div class="kpi-value" id="kpi-medio" style="color:var(--medio)">0</div></div>
+    <div class="kpi-card alto"><div class="kpi-title">Exposición Alta</div><div class="kpi-value" id="kpi-alto" style="color:var(--alto)">0</div></div>
+    <div class="kpi-card critico"><div class="kpi-title">Nivel Crítico</div><div class="kpi-value" id="kpi-critico" style="color:var(--critico)">0</div></div>
+</div>
+
+<div class="dashboard-grid">
+
+    <!-- Formulario de Evaluación PMO -->
+    <div>
+        <div class="card">
+            <div class="card-title">1. Registro de Evento (Estructura RBS)</div>
+            <div class="form-group">
+                <label for="nombre">Descriptor Corto del Riesgo</label>
+                <input id="nombre" class="form-control" placeholder="Ej. Fallo en pasarela de pagos">
+            </div>
+            <div class="form-group">
+                <label for="categoria">Tipo de Riesgo (Categoría de Proyecto)</label>
+                <select id="categoria" class="form-control">
+                    <option value="Técnico/Desarrollo">Técnico (Arquitectura / Código / API)</option>
+                    <option value="Externo/Mercado">Externo (Legal / Competencia / SUNAT)</option>
+                    <option value="Organizacional">Organizacional (Recursos / Presupuesto)</option>
+                    <option value="Gestión">Gestión de Proyecto (Estimación / Plazos)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">2. Estimación de Probabilidad e Impacto</div>
+            <div class="row-inputs">
+                <div class="form-group">
+                    <label for="prob">Probabilidad (0.00 a 1.00)</label>
+                    <input id="prob" class="form-control" type="number" step="0.05" min="0" max="1" placeholder="Ej. 0.30">
+                </div>
+                <div class="form-group">
+                    <label for="impacto">Impacto en Proyecto (0-100)</label>
+                    <input id="impacto" class="form-control" type="number" step="5" min="0" max="100" placeholder="Ej. 80">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">3. Tratamiento de Riesgos (PMBOK)</div>
+            <div class="form-group">
+                <label for="estrategia">Estrategia Planificada</label>
+                <select id="estrategia" class="form-control">
+                    <option value="Mitigar">Mitigar (Reducir severidad / pruebas adicionales)</option>
+                    <option value="Evitar">Evitar (Cambiar enfoque tecnológico / alcance)</option>
+                    <option value="Transferir">Transferir (Tercerizar pasarela / Seguros)</option>
+                    <option value="Aceptar">Aceptar (Establecer reserva de contingencia)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="control">Plan de Contingencia / Control Asignado</label>
+                <input id="control" class="form-control" placeholder="Ej. Implementar Stripe como pasarela alternativa de respaldo">
+            </div>
+            <button class="btn btn-primary" onclick="agregarRiesgo()">Ingresar a Línea Base de Riesgos</button>
+        </div>
+    </div>
+
+    <!-- Panel de Visualización del Proyecto -->
+    <div>
+        <div class="card">
+            <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>Mapa de Calor Continuo del Proyecto</span>
+                <div>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size:11px;" onclick="descargarMapa()">Guardar PNG</button>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size:11px;" onclick="exportarCSV()">Exportar CSV</button>
+                </div>
+            </div>
+            <div class="canvas-container">
+                <canvas id="graficoRiesgos"></canvas>
+            </div>
+        </div>
+
+        <!-- Registro de Riesgos Integrado -->
+        <div class="card">
+            <div class="card-title">Registro de Riesgos del Proyecto (Risk Register)</div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Riesgo Identificado</th>
+                            <th>Categoría</th>
+                            <th>Prob (P)</th>
+                            <th>Imp (I)</th>
+                            <th>Prioridad</th>
+                            <th>Estrategia</th>
+                            <th>Plan de Acción Asignado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaRiesgos">
+                        <!-- Inyección dinámica -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let listaRiesgos = [];
+let contadorId = 1;
+
+// Datos semilla específicos para simular un proyecto de app de taxis real desde el inicio
+const datosSemilla = [
+    { nombre: "Retraso en aprobación de cuenta de desarrollador en Apple Store / Google Play", categoria: "Externo/Mercado", x: 0.60, y: 70, estrategia: "Mitigar", control: "Iniciar carga de documentos legales en la primera semana del Sprint 1" },
+    { nombre: "Fallas críticas en la precisión de geolocalización (GPS de conductores de baja gama)", categoria: "Técnico/Desarrollo", x: 0.40, y: 85, estrategia: "Mitigar", control: "Integrar algoritmo de suavizado de ruta por acelerómetro y fallback de red" },
+    { nombre: "Deserciones tempranas de conductores por baja usabilidad del backend de registro", categoria: "Gestión", x: 0.35, y: 55, estrategia: "Mitigar", control: "Realizar pruebas de experiencia de usuario (UX) previas con prototipos interactivos" },
+    { nombre: "Saturación e indisponibilidad en la API de Mapas / Costos de consumo elevados", categoria: "Técnico/Desarrollo", x: 0.20, y: 90, estrategia: "Transferir", control: "Almacenar en caché local rutas comunes y evaluar Mapbox como contingencia" }
+];
+
+// Espectro de colores para diferenciar los puntos flotantes en la matriz
+const coloresPuntos = [
+    "#ffffff", "#38bdf8", "#f43f5e", "#4ade80", "#a855f7", "#f97316"
+];
+
+// Canvas Continuous Gradient Background Builder
+const fondoGradienteDiagonal = {
+    id: 'fondoGradienteDiagonal',
+    beforeDraw(chart) {
+        const {ctx, chartArea} = chart;
+        if (!chartArea) return;
+        const {left, right, top, bottom, width, height} = chartArea;
+
+        const grad = ctx.createLinearGradient(left, bottom, right, top);
+        grad.addColorStop(0.0, "#00b050");  // Seguro / Controlado
+        grad.addColorStop(0.35, "#eab308"); // Tolerable
+        grad.addColorStop(0.70, "#f97316"); // Alarma Alto
+        grad.addColorStop(1.0, "#ef4444");  // Catastrófico para el proyecto
+
+        ctx.save();
+        ctx.fillStyle = grad;
+        ctx.fillRect(left, top, width, height);
+        ctx.restore();
+    }
+};
+
+const etiquetasPuntos = {
+    id: 'etiquetasPuntos',
+    afterDatasetsDraw(chart) {
+        const {ctx} = chart;
+        ctx.font = "bold 11px sans-serif";
+        ctx.fillStyle = "#ffffff";
+
+        chart.data.datasets[0].data.forEach((punto, index) => {
+            const meta = chart.getDatasetMeta(0).data[index];
+            if(meta) {
+                ctx.fillText(`R-${punto.id}`, meta.x + 10, meta.y - 4);
+            }
+        });
+    }
+};
+
+Chart.register(fondoGradienteDiagonal, etiquetasPuntos);
+
+const ctx = document.getElementById('graficoRiesgos').getContext('2d');
+const chartRiesgos = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+        datasets: [{
+            data: [],
+            pointRadius: 9,
+            pointHoverRadius: 13,
+            backgroundColor: [],
+            borderColor: '#0b0f19',
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            x: {
+                type: 'linear',
+                min: 0,
+                max: 1,
+                title: { display: true, text: 'Probabilidad de Ocurrencia', font: { weight: 'bold', size: 12 }, color: '#9ca3af' },
+                grid: { color: 'rgba(255, 255, 255, 0.12)' },
+                ticks: { color: '#ffffff', font: { weight: '600' } }
+            },
+            y: {
+                type: 'linear',
+                min: 0,
+                max: 100,
+                title: { display: true, text: 'Severidad del Impacto (Costo/Tiempo)', font: { weight: 'bold', size: 12 }, color: '#9ca3af' },
+                grid: { color: 'rgba(255, 255, 255, 0.12)' },
+                ticks: { color: '#ffffff', font: { weight: '600' } }
+            }
+        },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return `R-${context.raw.id}: ${context.raw.nombre.substring(0, 45)}... (P: ${context.raw.x}, I: ${context.raw.y})`;
+                    }
+                }
+            }
+        }
+    }
+});
+
+function calcularPrioridad(p, i) {
+    const score = p * i;
+    if (score <= 15) return { texto: 'Baja', clase: 'bg-bajo' };
+    if (score <= 40) return { texto: 'Media', clase: 'bg-medio' };
+    if (score <= 70) return { texto: 'Alta', clase: 'bg-alto' };
+    return { texto: 'Crítica', clase: 'bg-critico' };
+}
+
+function agregarRiesgo() {
+    const nombre = document.getElementById('nombre').value.trim();
+    const categoria = document.getElementById('categoria').value;
+    let p = parseFloat(document.getElementById('prob').value);
+    const i = parseFloat(document.getElementById('impacto').value);
+    const estrategia = document.getElementById('estrategia').value;
+    const control = document.getElementById('control').value.trim() || 'No asignado';
+
+    if (!nombre || isNaN(p) || isNaN(i)) {
+        alert('Por favor, complete todos los campos operativos de evaluación.');
+        return;
+    }
+
+    if (p > 1) p = p / 100;
+    if (p < 0 || p > 1 || i < 0 || i > 100) {
+        alert('Rango incorrecto: Probabilidad [0 a 1.0] e Impacto [0 a 100].');
+        return;
+    }
+
+    listaRiesgos.push({ id: contadorId++, x: p, y: i, nombre, categoria, estrategia, control });
+    renderizarTodo();
+
+    // Reset Form
+    document.getElementById('nombre').value = '';
+    document.getElementById('prob').value = '';
+    document.getElementById('impacto').value = '';
+    document.getElementById('control').value = '';
+}
+
+function eliminarRiesgo(id) {
+    listaRiesgos = listaRiesgos.filter(r => r.id !== id);
+    renderizarTodo();
+}
+
+function renderizarTodo() {
+    chartRiesgos.data.datasets[0].data = listaRiesgos;
+    chartRiesgos.data.datasets[0].backgroundColor = listaRiesgos.map((_, i) => coloresPuntos[i % coloresPuntos.length]);
+    chartRiesgos.update();
+
+    const tbody = document.getElementById('tablaRiesgos');
+    let html = '';
+    let contadores = { Baja: 0, Media: 0, Alta: 0, Crítica: 0 };
+
+    listaRiesgos.forEach(r => {
+        const nivel = calcularPrioridad(r.x, r.y);
+        contadores[nivel.texto]++;
+
+        html += `
+            <tr>
+                <td><b>R-${r.id}</b></td>
+                <td><b>${r.nombre}</b></td>
+                <td><span style="color:#a3a3a3; font-size:12px;">${r.categoria}</span></td>
+                <td>${r.x.toFixed(2)}</td>
+                <td>${r.y}</td>
+                <td><span class="badge ${nivel.clase}">${nivel.texto}</span></td>
+                <td>${r.estrategia}</td>
+                <td><i>${r.control}</i></td>
+                <td><button class="btn-del" onclick="eliminarRiesgo(${r.id})">✕</button></td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html || '<tr><td colspan="9" style="text-align:center; color:#4b5563;">No hay riesgos identificados en el registro actual.</td></tr>';
+
+    document.getElementById('kpi-total').innerText = listaRiesgos.length;
+    document.getElementById('kpi-bajo').innerText = contadores['Baja'];
+    document.getElementById('kpi-medio').innerText = contadores['Media'];
+    document.getElementById('kpi-alto').innerText = contadores['Alta'];
+    document.getElementById('kpi-critico').innerText = contadores['Crítica'];
+}
+
+function descargarMapa() {
+    const a = document.createElement('a');
+    a.href = chartRiesgos.toBase64Image();
+    a.download = `PMO_MatrizRiesgos_AppTaxi.png`;
+    a.click();
+}
+
+function exportarCSV() {
+    if (listaRiesgos.length === 0) return;
+    let csv = "data:text/csv;charset=utf-8,ID,Riesgo,Categoria,Probabilidad,Impacto,Prioridad,Estrategia,Control\n";
+    listaRiesgos.forEach(r => {
+        const nivel = calcularPrioridad(r.x, r.y).texto;
+        csv += `${r.id},"${r.nombre}","${r.categoria}",${r.x},${r.y},${nivel},"${r.estrategia}","${r.control}"\n`;
+    });
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csv));
+    link.setAttribute("download", `Risk_Register_AppTaxi.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Inicialización de datos semilla automáticos para mostrar el potencial visual inmediato
+window.onload = () => {
+    datosSemilla.forEach(d => {
+        listaRiesgos.push({ id: contadorId++, x: d.x, y: d.y, nombre: d.nombre, categoria: d.categoria, estrategia: d.estrategia, control: d.control });
+    });
+    renderizarTodo();
+};
+</script>
+
+</body>
+</html>
