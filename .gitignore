@@ -2,3 +2,4 @@
 /__pycache__
 /spreadsheet_build
 /instance
+wsgi.log
