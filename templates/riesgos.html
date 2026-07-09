@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="module-hero mb-4">
+  <div class="module-toolbar">
+    <div class="text-start">
+      <h1 class="mb-0 fw-bold">Gestión de Riesgos</h1>
+    </div>
+    <div class="d-flex gap-2 flex-wrap justify-content-end">
+      <a class="btn btn-glass" href="{{ url_for('matriz') }}">Matriz</a>
+      <button class="btn btn-accent" type="button" data-open-modal="#riskModal" data-reset-modal="#riskModal"
+              data-action="{{ url_for('riesgos') }}" data-title="Nuevo riesgo" data-submit-label="Guardar riesgo">
+        <i class="bi bi-plus-lg me-1"></i>Riesgo
+      </button>
+    </div>
+  </div>
+</section>
+
+<section class="panel-soft">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="section-title mb-0">Riesgos del proyecto</h2>
+    <span class="module-chip">{{ current_risks|length }} registros</span>
+  </div>
+
+  <div class="table-responsive">
+        <table class="table soft-table align-middle datatable">
+      <thead>
+        <tr>
+          <th>Codigo</th>
+          <th>Activo</th>
+          <th>Riesgo</th>
+          <th>Prob.</th>
+          <th>Impacto</th>
+          <th>Nivel</th>
+          <th>Estado</th>
+          <th class="text-end">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for risk in current_risks %}
+          <tr>
+            <td>{{ risk.code }}</td>
+            <td>{{ risk.asset_name or risk.asset_label or "-" }}</td>
+            <td>
+              <div class="fw-semibold">{{ risk.name }}</div>
+              <div class="text-secondary small">{{ risk.horizon or "-" }}</div>
+            </td>
+            <td>{{ "%.2f"|format(risk.probability or 0) }}</td>
+            <td>{{ risk.impact or 0 }}</td>
+            <td><span class="status-pill {% if risk.level == 'Bajo' %}status-good{% elif risk.level == 'Medio' %}status-warn{% else %}status-bad{% endif %}">{{ risk.level or "Bajo" }}</span></td>
+            <td>{{ risk.status or "-" }}</td>
+            <td class="text-end">
+              <div class="d-inline-flex gap-2">
+                <button
+                  class="btn btn-sm btn-glass"
+                  type="button"
+                  data-open-modal="#riskModal"
+                  data-action="{{ url_for('riesgos') }}"
+                  data-title="Editar riesgo"
+                  data-submit-label="Actualizar riesgo"
+                  data-risk-id="{{ risk.id }}"
+                  data-asset-id="{{ risk.asset_id or '' }}"
+                  data-name="{{ risk.name|e }}"
+                  data-description="{{ risk.description|e }}"
+                  data-cause="{{ risk.cause|e }}"
+                  data-consequence="{{ risk.consequence|e }}"
+                  data-probability="{{ risk.probability if risk.probability is not none else 0 }}"
+                  data-impact="{{ risk.impact if risk.impact is not none else 0 }}"
+                  data-level="{{ risk.level|e }}"
+                  data-horizon="{{ risk.horizon|e }}"
+                  data-owner="{{ risk.owner|e }}"
+                  data-status="{{ risk.status|e }}"
+                  data-strategy="{{ risk.strategy|e }}"
+                >
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="post" action="{{ url_for('delete_risk_route', risk_id=risk.id) }}" class="d-inline js-confirm-delete" data-delete-label="el riesgo {{ risk.code }}">
+                  <button class="btn btn-sm btn-glass" type="submit"><i class="bi bi-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-secondary py-4">No hay riesgos cargados para el proyecto seleccionado.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="modal fade" id="riskModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-white border border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" data-modal-title>Nuevo riesgo</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <form method="post" action="{{ url_for('riesgos') }}">
+        <div class="modal-body">
+          <input type="hidden" name="risk_id" data-field="risk-id">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Activo</label>
+              <select class="form-select" name="asset_id" data-field="asset-id">
+                <option value="">Selecciona un activo</option>
+                {% for asset in asset_options %}
+                  <option value="{{ asset.id }}">{{ asset.code }} - {{ asset.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Riesgo</label>
+              <input class="form-control" name="name" data-field="name" placeholder="Caida de API">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Descripcion</label>
+              <textarea class="form-control" name="description" rows="2" data-field="description"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Causa</label>
+              <textarea class="form-control" name="cause" rows="2" data-field="cause"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Consecuencia</label>
+              <textarea class="form-control" name="consequence" rows="2" data-field="consequence"></textarea>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Probabilidad</label>
+              <input class="form-control" name="probability" type="number" min="0" max="1" step="0.05" data-field="probability" value="0">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Impacto</label>
+              <input class="form-control" name="impact" type="number" min="0" max="100" step="1" data-field="impact" value="0">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Nivel</label>
+              <input class="form-control" name="level" data-field="level" placeholder="Auto">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Horizonte</label>
+              <select class="form-select" name="horizon" data-field="horizon">
+                <option value="">Selecciona</option>
+                <option value="Corto">Corto</option>
+                <option value="Medio">Medio</option>
+                <option value="Largo">Largo</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Responsable</label>
+              <input class="form-control" name="owner" data-field="owner" placeholder="Area TI">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Estado</label>
+              <select class="form-select" name="status" data-field="status">
+                <option value="Identificado">Identificado</option>
+                <option value="Evaluado">Evaluado</option>
+                <option value="En tratamiento">En tratamiento</option>
+                <option value="Mitigado">Mitigado</option>
+                <option value="Aceptado">Aceptado</option>
+                <option value="Cerrado">Cerrado</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Estrategia</label>
+              <select class="form-select" name="strategy" data-field="strategy">
+                <option value="Evitar">Evitar</option>
+                <option value="Mitigar">Mitigar</option>
+                <option value="Transferir">Transferir</option>
+                <option value="Aceptar">Aceptar</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-accent" data-submit-label>Guardar riesgo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
