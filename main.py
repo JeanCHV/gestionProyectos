@@ -50,6 +50,9 @@ from db import (
 from excel_utils import load_template_bytes, parse_imported_workbook
 
 
+BASE_DIR = Path(__file__).resolve().parent
+
+
 def create_app() -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "gestion-proyectos-dev")
@@ -132,7 +135,7 @@ def create_app() -> Flask:
             title="Proyectos",
             active_page="proyectos",
             editing_project=editing_project,
-            template_ready=bool(Path("static/files/template_riesgos.xlsx").exists()),
+            template_ready=bool((BASE_DIR / "static" / "files" / "template_riesgos.xlsx").exists()),
         )
 
     def _render_assets(editing_asset: dict[str, Any] | None = None):
@@ -253,7 +256,12 @@ def create_app() -> Flask:
 
     @app.route("/proyectos/template")
     def proyectos_template():
-        template_bytes = load_template_bytes()
+        try:
+            template_bytes = load_template_bytes()
+        except FileNotFoundError:
+            flash("No se encontro la plantilla Excel en el servidor.", "error")
+            return redirect(url_for("proyectos"))
+
         return send_file(
             BytesIO(template_bytes),
             as_attachment=True,

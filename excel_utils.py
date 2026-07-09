@@ -11,7 +11,8 @@ from openpyxl import load_workbook
 from openpyxl.utils.datetime import from_excel
 
 
-TEMPLATE_PATH = Path("static/files/template_riesgos_fixed.xlsx")
+BASE_DIR = Path(__file__).resolve().parent
+TEMPLATE_PATH = BASE_DIR / "static" / "files" / "template_riesgos.xlsx"
 
 
 def _normalize_date(value: Any) -> str | None:
