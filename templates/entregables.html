@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card card-outline card-primary">
+      <div class="card-header py-2">
+        <h3 class="card-title mb-0">Entregables del proyecto</h3>
+        <div class="card-tools">
+          <button
+            class="btn btn-primary btn-sm"
+            type="button"
+            data-open-modal="#deliverableModal"
+            data-reset-modal="#deliverableModal"
+            data-action="{{ url_for('entregables') }}"
+            data-title="Nuevo entregable"
+            data-submit-label="Guardar entregable"
+          >
+            <i class="bi bi-plus-lg me-1"></i>Entregable
+          </button>
+        </div>
+      </div>
+      <div class="card-body table-responsive p-0">
+        <table id="deliverablesTable" class="table table-striped table-hover align-middle mb-0 datatable">
+          <thead>
+            <tr>
+              <th>Entregable</th>
+              <th>Descripción</th>
+              <th>Responsable principal</th>
+              <th>Estado</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for deliverable in project_deliverables %}
+              <tr>
+                <td class="fw-semibold">{{ deliverable.deliverable }}</td>
+                <td>{{ deliverable.description or "-" }}</td>
+                <td>{{ deliverable.main_responsible or "-" }}</td>
+                <td><span class="badge text-bg-primary">{{ deliverable.status or "Pendiente" }}</span></td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2">
+                    <button
+                      class="btn btn-outline-primary btn-sm"
+                      type="button"
+                      data-open-modal="#deliverableModal"
+                      data-action="{{ url_for('entregables') }}"
+                      data-title="Editar entregable"
+                      data-submit-label="Actualizar entregable"
+                      data-deliverable-id="{{ deliverable.id }}"
+                      data-deliverable="{{ deliverable.deliverable|e }}"
+                      data-description="{{ deliverable.description|e }}"
+                      data-main-responsible="{{ deliverable.main_responsible|e }}"
+                      data-status="{{ deliverable.status|e }}"
+                    >
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <form method="post" action="{{ url_for('delete_deliverable_route', deliverable_id=deliverable.id) }}" class="d-inline js-confirm-delete" data-delete-label="el entregable {{ deliverable.deliverable }}">
+                      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="5" class="text-center text-secondary py-4">No hay entregables cargados para el proyecto seleccionado.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deliverableModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content shadow border-0 rounded-4">
+      <div class="modal-header">
+        <h5 class="modal-title" data-modal-title>Nuevo entregable</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <form method="post" action="{{ url_for('entregables') }}">
+        <div class="modal-body">
+          <input type="hidden" name="deliverable_id" data-field="deliverable-id">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Entregable</label>
+              <input class="form-control" name="deliverable" data-field="deliverable" placeholder="Registro de riesgos" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Responsable principal</label>
+              <input class="form-control" name="main_responsible" data-field="main-responsible" placeholder="Director del proyecto / Scrum Master">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Descripción</label>
+              <textarea class="form-control" name="description" rows="3" data-field="description"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Estado</label>
+              <select class="form-select" name="status" data-field="status">
+                <option value="Pendiente">Pendiente</option>
+                <option value="En progreso">En progreso</option>
+                <option value="Completado">Completado</option>
+                <option value="Aprobado">Aprobado</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" data-submit-label>Guardar entregable</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const table = document.getElementById("deliverablesTable");
+    if (!table || !window.jQuery || !jQuery.fn?.DataTable || jQuery.fn.DataTable.isDataTable(table)) return;
+
+    const headerCount = table.querySelectorAll("thead th").length;
+    const bodyRows = Array.from(table.tBodies[0]?.rows || []);
+    const hasRealRows = bodyRows.some((row) => row.cells.length !== 1 || row.cells[0].colSpan < headerCount);
+    if (!hasRealRows) return;
+
+    jQuery(table).DataTable({
+      paging: false,
+      autoWidth: false,
+      scrollY: "calc(65vh)",
+      scrollCollapse: false,
+      order: [],
+      dom: "<'d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3'Bf>rt<'d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3'i>",
+      buttons: [
+        { extend: "copyHtml5", text: '<i class="bi bi-clipboard me-1"></i>Copiar', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Copiar" },
+        { extend: "csvHtml5", text: '<i class="bi bi-filetype-csv me-1"></i>CSV', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "CSV" },
+        { extend: "excelHtml5", text: '<i class="bi bi-file-earmark-excel me-1"></i>Excel', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Excel" },
+        { extend: "pdfHtml5", text: '<i class="bi bi-file-earmark-pdf me-1"></i>PDF', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "PDF" },
+        { extend: "print", text: '<i class="bi bi-printer me-1"></i>Imprimir', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Imprimir" },
+        { extend: "colvis", text: '<i class="bi bi-layout-three-columns me-1"></i>Columnas', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Columnas" },
+      ],
+      language: {
+        search: "Buscar:",
+        lengthMenu: "Mostrar _MENU_ registros",
+        info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+        infoEmpty: "Sin registros disponibles",
+        infoFiltered: "(filtrado de _MAX_ registros totales)",
+        zeroRecords: "No se encontraron coincidencias",
+        paginate: {
+          first: "Primero",
+          last: "Último",
+          next: "Siguiente",
+          previous: "Anterior",
+        },
+      },
+      initComplete() {
+        const wrapper = this.api().table().container();
+        wrapper.querySelector(".dt-buttons")?.classList.add("d-flex", "flex-wrap", "gap-2");
+        wrapper.querySelectorAll(".dt-buttons .btn").forEach((btn) => btn.classList.add("me-1", "mb-1"));
+      },
+    });
+  });
+</script>
+{% endblock %}

@@ -92,6 +92,12 @@
               </a>
             </li>
             <li class="nav-item">
+              <a href="{{ url_for('entregables') }}" class="nav-link {% if active_page == 'entregables' %}active{% endif %}">
+                <i class="nav-icon bi bi-file-earmark-check"></i>
+                <p>Entregables</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="{{ url_for('cronograma') }}" class="nav-link {% if active_page == 'cronograma' %}active{% endif %}">
                 <i class="nav-icon bi bi-calendar2-week"></i>
                 <p>Cronograma</p>

@@ -129,6 +129,7 @@ def _pick(mapped: dict[str, Any], *aliases: str, default: Any = None) -> Any:
 class ImportedWorkbook:
     project: dict[str, Any] | None
     roles: list[dict[str, Any]]
+    deliverables: list[dict[str, Any]]
     threats: list[dict[str, Any]]
     safeguards: list[dict[str, Any]]
     assets: list[dict[str, Any]]
@@ -185,6 +186,25 @@ def parse_imported_workbook(file_bytes: bytes) -> ImportedWorkbook:
                     "role": role_name,
                     "acquisition_type": _pick(item, "Tipo de adquisicion", "Tipo de adquisición", "Adquisicion") or "",
                     "risk_participation": _pick(item, "Participacion en riesgos", "Participación en riesgos") or "",
+                }
+            )
+
+    deliverables: list[dict[str, Any]] = []
+    if "Entregables" in wb.sheetnames:
+        ws = wb["Entregables"]
+        rows = _sheet_rows(ws, wb, start_row=2)
+        headers = rows[0] if rows else []
+        for row in rows[1:]:
+            item = _row_map(headers, row)
+            deliverable_name = _pick(item, "Entregable") or ""
+            if not deliverable_name:
+                continue
+            deliverables.append(
+                {
+                    "deliverable": deliverable_name,
+                    "description": _pick(item, "Descripcion", "Descripción") or "",
+                    "main_responsible": _pick(item, "Responsable principal", "Responsable") or "",
+                    "status": _pick(item, "Estado", "Status") or "Pendiente",
                 }
             )
 
@@ -313,6 +333,7 @@ def parse_imported_workbook(file_bytes: bytes) -> ImportedWorkbook:
     return ImportedWorkbook(
         project=project_data,
         roles=roles,
+        deliverables=deliverables,
         threats=threats,
         safeguards=safeguards,
         assets=assets,

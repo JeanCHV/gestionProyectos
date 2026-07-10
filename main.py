@@ -35,6 +35,7 @@ from db import (
     create_asset,
     create_mitigation,
     create_project,
+    create_project_deliverable,
     create_project_safeguard,
     create_project_threat,
     create_project_role,
@@ -45,10 +46,12 @@ from db import (
     delete_asset,
     delete_mitigation,
     delete_project,
+    delete_project_deliverable,
     delete_risk,
     get_asset,
     get_mitigation,
     get_project,
+    get_project_deliverable,
     get_project_safeguard,
     get_project_threat,
     get_project_role,
@@ -69,6 +72,7 @@ from db import (
     update_asset,
     update_mitigation,
     update_project,
+    update_project_deliverable,
     update_project_safeguard,
     update_project_threat,
     update_project_role,
@@ -844,7 +848,12 @@ def _build_project_pdf_clean(context: dict[str, Any]) -> bytes:
         story.append(table)
         story.append(Spacer(1, 8))
 
-    add_table("Entregables", ["Entregable"], [[item.get("deliverable")] for item in context["deliverables"]], [245 * mm])
+    add_table(
+        "Entregables",
+        ["Entregable", "Descripción", "Responsable principal"],
+        [[item.get("deliverable"), item.get("description"), item.get("main_responsible")] for item in context["deliverables"]],
+        [58 * mm, 110 * mm, 62 * mm],
+    )
     add_table("Roles", ["Rol", "Adquisición", "Participación en riesgos"], [[item.get("role"), item.get("acquisition_type"), item.get("risk_participation")] for item in context["roles"]], [62 * mm, 38 * mm, 95 * mm])
     add_table("Activos", ["Activo", "Tipo de activo", "Valor"], [[item.get("name"), item.get("type"), item.get("value")] for item in context["assets"]], [78 * mm, 65 * mm, 52 * mm])
     add_table("Amenazas", ["Código", "Amenaza", "Activo afectado", "Ejemplo"], [[item.get("code"), item.get("threat"), item.get("affected_asset"), item.get("example")] for item in context["threats"]], [24 * mm, 45 * mm, 85 * mm, 40 * mm])
@@ -928,6 +937,7 @@ def create_app() -> Flask:
             "select_project",
             "cronograma",
             "activos",
+            "entregables",
             "riesgos",
             "roles",
             "amenazas",
@@ -998,6 +1008,16 @@ def create_app() -> Flask:
             current_assets=list_assets(project_id),
             editing_asset=editing_asset,
             asset_options=list_assets_for_select(project_id),
+        )
+
+    def _render_deliverables(editing_deliverable: dict[str, Any] | None = None):
+        project_id = _selected_project_id()
+        return render_template(
+            "entregables.html",
+            title="Entregables",
+            active_page="entregables",
+            project_deliverables=list_project_deliverables(project_id),
+            editing_deliverable=editing_deliverable,
         )
 
     def _render_cronograma():
@@ -1192,6 +1212,9 @@ def create_app() -> Flask:
         for role in workbook.roles:
             create_project_role(created_project["id"], role)
 
+        for deliverable in workbook.deliverables:
+            create_project_deliverable(created_project["id"], deliverable)
+
         for threat in workbook.threats:
             created_threat = create_project_threat(created_project["id"], threat)
             if created_threat:
@@ -1236,7 +1259,7 @@ def create_app() -> Flask:
 
         _set_selected_project(created_project["id"])
         flash(
-            f"Importacion completada: 1 proyecto, {len(workbook.roles)} roles, {len(workbook.threats)} amenazas, "
+            f"Importacion completada: 1 proyecto, {len(workbook.roles)} roles, {len(workbook.deliverables)} entregables, {len(workbook.threats)} amenazas, "
             f"{len(workbook.safeguards)} salvaguardas, {len(workbook.assets)} activos, "
             f"{len(workbook.risks)} riesgos y {mitigation_count} mitigaciones.",
             "success",
@@ -1279,6 +1302,44 @@ def create_app() -> Flask:
             delete_asset(asset_id)
             flash("Activo eliminado.", "success")
         return redirect(url_for("activos"))
+
+    @app.route("/entregables", methods=["GET", "POST"])
+    def entregables():
+        project_id = _require_project()
+        if not project_id:
+            return redirect(url_for("proyectos"))
+
+        if request.method == "POST":
+            deliverable_id = request.form.get("deliverable_id", type=int)
+            payload = {
+                "deliverable": request.form.get("deliverable", ""),
+                "description": request.form.get("description", ""),
+                "main_responsible": request.form.get("main_responsible", ""),
+                "status": request.form.get("status", "Pendiente"),
+            }
+            if deliverable_id:
+                if not get_project_deliverable(deliverable_id):
+                    flash("El entregable no existe.", "error")
+                else:
+                    update_project_deliverable(deliverable_id, payload)
+                    flash("Entregable actualizado.", "success")
+            else:
+                create_project_deliverable(project_id, payload)
+                flash("Entregable creado.", "success")
+            return redirect(url_for("entregables"))
+
+        edit_id = request.args.get("edit", type=int)
+        editing_deliverable = get_project_deliverable(edit_id) if edit_id else None
+        return _render_deliverables(editing_deliverable=editing_deliverable)
+
+    @app.route("/entregables/delete/<int:deliverable_id>", methods=["POST"])
+    def delete_deliverable_route(deliverable_id: int):
+        if not get_project_deliverable(deliverable_id):
+            flash("El entregable no existe.", "error")
+        else:
+            delete_project_deliverable(deliverable_id)
+            flash("Entregable eliminado.", "success")
+        return redirect(url_for("entregables"))
 
     @app.route("/cronograma")
     def cronograma():

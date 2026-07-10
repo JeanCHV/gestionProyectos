@@ -94,6 +94,8 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER NOT NULL,
             deliverable TEXT NOT NULL,
+            description TEXT,
+            main_responsible TEXT,
             status TEXT DEFAULT 'Pendiente',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -185,6 +187,12 @@ def init_db() -> None:
     if "trigger" not in mitigation_columns:
         conn.execute("ALTER TABLE mitigations ADD COLUMN trigger TEXT")
         conn.commit()
+    deliverable_columns = {row[1] for row in conn.execute("PRAGMA table_info(project_deliverables)").fetchall()}
+    if "description" not in deliverable_columns:
+        conn.execute("ALTER TABLE project_deliverables ADD COLUMN description TEXT")
+    if "main_responsible" not in deliverable_columns:
+        conn.execute("ALTER TABLE project_deliverables ADD COLUMN main_responsible TEXT")
+    conn.commit()
     conn.close()
 
 
@@ -265,12 +273,14 @@ def list_project_deliverables(project_id: int | None) -> list[dict[str, Any]]:
 def create_project_deliverable(project_id: int, data: dict[str, Any]) -> dict[str, Any]:
     cursor = execute(
         """
-        INSERT INTO project_deliverables (project_id, deliverable, status)
-        VALUES (?, ?, ?)
+        INSERT INTO project_deliverables (project_id, deliverable, description, main_responsible, status)
+        VALUES (?, ?, ?, ?, ?)
         """,
         (
             project_id,
             data.get("deliverable", "").strip(),
+            data.get("description", "").strip(),
+            data.get("main_responsible", "").strip(),
             data.get("status", "Pendiente"),
         ),
     )
@@ -285,11 +295,13 @@ def update_project_deliverable(deliverable_id: int, data: dict[str, Any]) -> Non
     execute(
         """
         UPDATE project_deliverables
-        SET deliverable = ?, status = ?
+        SET deliverable = ?, description = ?, main_responsible = ?, status = ?
         WHERE id = ?
         """,
         (
             data.get("deliverable", "").strip(),
+            data.get("description", "").strip(),
+            data.get("main_responsible", "").strip(),
             data.get("status", "Pendiente"),
             deliverable_id,
         ),
