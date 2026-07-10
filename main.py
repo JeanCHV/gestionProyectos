@@ -37,6 +37,7 @@ from db import (
     create_project,
     create_project_deliverable,
     create_project_safeguard,
+    create_project_schedule,
     create_project_threat,
     create_project_role,
     create_risk,
@@ -47,12 +48,14 @@ from db import (
     delete_mitigation,
     delete_project,
     delete_project_deliverable,
+    delete_project_schedule,
     delete_risk,
     get_asset,
     get_mitigation,
     get_project,
     get_project_deliverable,
     get_project_safeguard,
+    get_project_schedule,
     get_project_threat,
     get_project_role,
     get_risk,
@@ -63,6 +66,7 @@ from db import (
     list_projects,
     list_project_deliverables,
     list_project_safeguards,
+    list_project_schedule,
     list_project_threats,
     list_risk_names,
     list_project_roles,
@@ -74,6 +78,7 @@ from db import (
     update_project,
     update_project_deliverable,
     update_project_safeguard,
+    update_project_schedule,
     update_project_threat,
     update_project_role,
     update_risk,
@@ -485,7 +490,7 @@ def _project_report_context(project_id: int) -> dict[str, Any]:
         "matrix_rows": matrix_rows,
         "mitigations": list_mitigations(project_id),
         "summary": report_summary(project_id),
-        "cronograma_phases": _project_cronograma_phases(),
+        "cronograma_phases": list_project_schedule(project_id),
     }
 
 
@@ -810,9 +815,10 @@ def _build_project_pdf_clean(context: dict[str, Any]) -> bytes:
         phases = context["cronograma_phases"]
         data: list[list[Any]] = [[p("Actividades", small_style), *[p(period, small_style) for period in range(1, 13)]]]
         for phase in phases:
+            risks_text = ", ".join(phase.get("risks_list") or []) or _safe_text(phase.get("risks"))
             activity = [
                 Paragraph(
-                    f"<b>{xml_escape(_safe_text(phase.get('phase')))}</b><br/>{xml_escape(', '.join(phase.get('risks', [])))}<br/><font color='#64748b'>{xml_escape(_safe_text(phase.get('control')))}</font>",
+                    f"<b>{xml_escape(_safe_text(phase.get('phase')))}</b><br/>{xml_escape(risks_text)}<br/><font color='#64748b'>{xml_escape(_safe_text(phase.get('control')))}</font>",
                     small_style,
                 )
             ]
@@ -1021,11 +1027,12 @@ def create_app() -> Flask:
         )
 
     def _render_cronograma():
+        project_id = _selected_project_id()
         return render_template(
             "cronograma.html",
             title="Cronograma",
             active_page="cronograma",
-            cronograma_phases=_project_cronograma_phases(),
+            cronograma_phases=list_project_schedule(project_id),
         )
 
     def _render_risks(editing_risk: dict[str, Any] | None = None, template_name: str = "riesgos.html"):
@@ -1058,6 +1065,7 @@ def create_app() -> Flask:
             project_threats=list_project_threats(project_id),
             project_safeguards=list_project_safeguards(project_id),
             threat_options=list_project_threats(project_id),
+            asset_options=list_assets_for_select(project_id),
             editing_threat=editing_threat,
             editing_safeguard=editing_safeguard,
         )
@@ -1215,6 +1223,9 @@ def create_app() -> Flask:
         for deliverable in workbook.deliverables:
             create_project_deliverable(created_project["id"], deliverable)
 
+        for schedule_item in workbook.schedule:
+            create_project_schedule(created_project["id"], schedule_item)
+
         for threat in workbook.threats:
             created_threat = create_project_threat(created_project["id"], threat)
             if created_threat:
@@ -1259,7 +1270,7 @@ def create_app() -> Flask:
 
         _set_selected_project(created_project["id"])
         flash(
-            f"Importacion completada: 1 proyecto, {len(workbook.roles)} roles, {len(workbook.deliverables)} entregables, {len(workbook.threats)} amenazas, "
+            f"Importacion completada: 1 proyecto, {len(workbook.roles)} roles, {len(workbook.deliverables)} entregables, {len(workbook.schedule)} fases de cronograma, {len(workbook.threats)} amenazas, "
             f"{len(workbook.safeguards)} salvaguardas, {len(workbook.assets)} activos, "
             f"{len(workbook.risks)} riesgos y {mitigation_count} mitigaciones.",
             "success",
@@ -1341,12 +1352,42 @@ def create_app() -> Flask:
             flash("Entregable eliminado.", "success")
         return redirect(url_for("entregables"))
 
-    @app.route("/cronograma")
+    @app.route("/cronograma", methods=["GET", "POST"])
     def cronograma():
         project_id = _require_project()
         if not project_id:
             return redirect(url_for("proyectos"))
+        if request.method == "POST":
+            schedule_id = request.form.get("schedule_id", type=int)
+            payload = {
+                "phase": request.form.get("phase", ""),
+                "risks": request.form.get("risks", ""),
+                "control": request.form.get("control", ""),
+                "start_period": request.form.get("start_period", type=int) or 1,
+                "end_period": request.form.get("end_period", type=int) or 1,
+            }
+            if payload["end_period"] < payload["start_period"]:
+                payload["end_period"] = payload["start_period"]
+            if schedule_id:
+                if not get_project_schedule(schedule_id):
+                    flash("La fase del cronograma no existe.", "error")
+                else:
+                    update_project_schedule(schedule_id, payload)
+                    flash("Fase del cronograma actualizada.", "success")
+            else:
+                create_project_schedule(project_id, payload)
+                flash("Fase del cronograma creada.", "success")
+            return redirect(url_for("cronograma"))
         return _render_cronograma()
+
+    @app.route("/cronograma/delete/<int:schedule_id>", methods=["POST"])
+    def delete_schedule_route(schedule_id: int):
+        if not get_project_schedule(schedule_id):
+            flash("La fase del cronograma no existe.", "error")
+        else:
+            delete_project_schedule(schedule_id)
+            flash("Fase del cronograma eliminada.", "success")
+        return redirect(url_for("cronograma"))
 
     @app.route("/proyecto/pdf")
     def pdf_proyecto():

@@ -154,7 +154,12 @@
             </div>
             <div class="col-md-6">
               <label class="form-label">Activo afectado</label>
-              <input class="form-control" name="affected_asset" data-field="affected-asset" placeholder="Dataset, documentos, requisitos">
+              <select class="form-select" name="affected_asset" data-field="affected-asset">
+                <option value="">Selecciona un activo</option>
+                {% for asset in asset_options %}
+                  <option value="{{ asset.name }}">{{ asset.code }} - {{ asset.name }}</option>
+                {% endfor %}
+              </select>
             </div>
             <div class="col-12">
               <label class="form-label">Ejemplo en el proyecto</label>

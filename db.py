@@ -101,6 +101,18 @@ def init_db() -> None:
             FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS project_schedule (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            phase TEXT NOT NULL,
+            risks TEXT,
+            control TEXT,
+            start_period INTEGER DEFAULT 1,
+            end_period INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS project_threats (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             code TEXT UNIQUE,
@@ -310,6 +322,68 @@ def update_project_deliverable(deliverable_id: int, data: dict[str, Any]) -> Non
 
 def delete_project_deliverable(deliverable_id: int) -> None:
     execute("DELETE FROM project_deliverables WHERE id = ?", (deliverable_id,))
+
+
+def list_project_schedule(project_id: int | None) -> list[dict[str, Any]]:
+    if not project_id:
+        return []
+    rows = query_all(
+        """
+        SELECT *
+        FROM project_schedule
+        WHERE project_id = ?
+        ORDER BY start_period ASC, id ASC
+        """,
+        (project_id,),
+    )
+    for row in rows:
+        risks = row.get("risks") or ""
+        row["risks_list"] = [item.strip() for item in risks.split(",") if item.strip()]
+    return rows
+
+
+def create_project_schedule(project_id: int, data: dict[str, Any]) -> dict[str, Any]:
+    cursor = execute(
+        """
+        INSERT INTO project_schedule (project_id, phase, risks, control, start_period, end_period)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            project_id,
+            data.get("phase", "").strip(),
+            data.get("risks", "").strip(),
+            data.get("control", "").strip(),
+            int(data.get("start_period") or 1),
+            int(data.get("end_period") or data.get("start_period") or 1),
+        ),
+    )
+    return query_one("SELECT * FROM project_schedule WHERE id = ?", (cursor.lastrowid,)) or {}
+
+
+def get_project_schedule(schedule_id: int) -> dict[str, Any] | None:
+    return query_one("SELECT * FROM project_schedule WHERE id = ?", (schedule_id,))
+
+
+def update_project_schedule(schedule_id: int, data: dict[str, Any]) -> None:
+    execute(
+        """
+        UPDATE project_schedule
+        SET phase = ?, risks = ?, control = ?, start_period = ?, end_period = ?
+        WHERE id = ?
+        """,
+        (
+            data.get("phase", "").strip(),
+            data.get("risks", "").strip(),
+            data.get("control", "").strip(),
+            int(data.get("start_period") or 1),
+            int(data.get("end_period") or data.get("start_period") or 1),
+            schedule_id,
+        ),
+    )
+
+
+def delete_project_schedule(schedule_id: int) -> None:
+    execute("DELETE FROM project_schedule WHERE id = ?", (schedule_id,))
 
 
 def list_project_threats(project_id: int | None) -> list[dict[str, Any]]:

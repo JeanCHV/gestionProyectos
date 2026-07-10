@@ -43,7 +43,12 @@ document.querySelectorAll("[data-open-modal]").forEach((button) => {
     fields.forEach((field) => {
       const key = field.getAttribute("data-field");
       const value = button.dataset[toDataKey(key)] ?? "";
-      if (field.tagName === "SELECT" || field.tagName === "INPUT" || field.tagName === "TEXTAREA") {
+      if (field.tagName === "SELECT") {
+        if (value && !Array.from(field.options).some((option) => option.value === value)) {
+          field.add(new Option(value, value));
+        }
+        field.value = value;
+      } else if (field.tagName === "INPUT" || field.tagName === "TEXTAREA") {
         field.value = value;
       } else {
         field.textContent = value;

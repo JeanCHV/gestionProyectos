@@ -90,6 +90,19 @@
     <div class="card card-outline card-primary">
       <div class="card-header py-2">
         <h3 class="card-title mb-0">Cronograma del proyecto</h3>
+        <div class="card-tools">
+          <button
+            class="btn btn-primary btn-sm"
+            type="button"
+            data-open-modal="#scheduleModal"
+            data-reset-modal="#scheduleModal"
+            data-action="{{ url_for('cronograma') }}"
+            data-title="Nueva fase"
+            data-submit-label="Guardar fase"
+          >
+            <i class="bi bi-plus-lg me-1"></i>Fase
+          </button>
+        </div>
       </div>
       <div class="card-body">
         <ul class="nav nav-tabs mb-3" id="cronogramaTabs" role="tablist">
@@ -109,14 +122,46 @@
                     <th>Fase del cronograma</th>
                     <th>Riesgos más relevantes</th>
                     <th>Acciones de control</th>
+                    <th>Inicio</th>
+                    <th>Fin</th>
+                    <th class="text-end">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {% for phase in cronograma_phases %}
                     <tr>
                       <td class="fw-semibold">{{ phase.phase }}</td>
-                      <td>{{ phase.risks|join(', ') }}</td>
+                      <td>{{ phase.risks }}</td>
                       <td>{{ phase.control }}</td>
+                      <td>{{ phase.start_period }}</td>
+                      <td>{{ phase.end_period }}</td>
+                      <td class="text-end">
+                        <div class="d-inline-flex gap-2">
+                          <button
+                            class="btn btn-outline-primary btn-sm"
+                            type="button"
+                            data-open-modal="#scheduleModal"
+                            data-action="{{ url_for('cronograma') }}"
+                            data-title="Editar fase"
+                            data-submit-label="Actualizar fase"
+                            data-schedule-id="{{ phase.id }}"
+                            data-phase="{{ phase.phase|e }}"
+                            data-risks="{{ phase.risks|e }}"
+                            data-control="{{ phase.control|e }}"
+                            data-start-period="{{ phase.start_period }}"
+                            data-end-period="{{ phase.end_period }}"
+                          >
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                          <form method="post" action="{{ url_for('delete_schedule_route', schedule_id=phase.id) }}" class="d-inline js-confirm-delete" data-delete-label="la fase {{ phase.phase }}">
+                            <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  {% else %}
+                    <tr>
+                      <td colspan="6" class="text-center text-secondary py-4">No hay fases de cronograma para el proyecto seleccionado.</td>
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -136,7 +181,7 @@
                   <div class="schedule-cell schedule-activity">
                     <div class="fw-semibold">{{ phase.phase }}</div>
                     <div class="d-flex flex-wrap gap-1">
-                      {% for risk_id in phase.risks %}
+                      {% for risk_id in phase.risks_list %}
                         <span class="schedule-risk">{{ risk_id }}</span>
                       {% endfor %}
                     </div>
@@ -156,6 +201,56 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content shadow border-0 rounded-4">
+      <div class="modal-header">
+        <h5 class="modal-title" data-modal-title>Nueva fase</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <form method="post" action="{{ url_for('cronograma') }}">
+        <div class="modal-body">
+          <input type="hidden" name="schedule_id" data-field="schedule-id">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Fase del cronograma</label>
+              <input class="form-control" name="phase" data-field="phase" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Inicio</label>
+              <select class="form-select" name="start_period" data-field="start-period">
+                {% for period in range(1, 13) %}
+                  <option value="{{ period }}">{{ period }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fin</label>
+              <select class="form-select" name="end_period" data-field="end-period">
+                {% for period in range(1, 13) %}
+                  <option value="{{ period }}">{{ period }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Riesgos más relevantes</label>
+              <input class="form-control" name="risks" data-field="risks" placeholder="R01, R02, R03">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Acciones de control</label>
+              <textarea class="form-control" name="control" rows="3" data-field="control"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" data-submit-label>Guardar fase</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

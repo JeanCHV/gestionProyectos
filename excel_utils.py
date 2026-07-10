@@ -130,6 +130,7 @@ class ImportedWorkbook:
     project: dict[str, Any] | None
     roles: list[dict[str, Any]]
     deliverables: list[dict[str, Any]]
+    schedule: list[dict[str, Any]]
     threats: list[dict[str, Any]]
     safeguards: list[dict[str, Any]]
     assets: list[dict[str, Any]]
@@ -205,6 +206,30 @@ def parse_imported_workbook(file_bytes: bytes) -> ImportedWorkbook:
                     "description": _pick(item, "Descripcion", "Descripción") or "",
                     "main_responsible": _pick(item, "Responsable principal", "Responsable") or "",
                     "status": _pick(item, "Estado", "Status") or "Pendiente",
+                }
+            )
+
+    schedule_defaults = [(1, 2), (3, 3), (4, 5), (6, 7), (8, 9), (10, 10), (11, 12)]
+    schedule: list[dict[str, Any]] = []
+    if "Cronograma" in wb.sheetnames:
+        ws = wb["Cronograma"]
+        rows = _sheet_rows(ws, wb, start_row=2)
+        headers = rows[0] if rows else []
+        for index, row in enumerate(rows[1:]):
+            item = _row_map(headers, row)
+            phase = _pick(item, "Fase del cronograma", "Fase", "Actividad") or ""
+            if not phase:
+                continue
+            default_start, default_end = schedule_defaults[index] if index < len(schedule_defaults) else (index + 1, index + 1)
+            start_period = _pick(item, "Inicio", "Periodo inicio", "Período inicio") or default_start
+            end_period = _pick(item, "Fin", "Periodo fin", "Período fin") or default_end
+            schedule.append(
+                {
+                    "phase": phase,
+                    "risks": _pick(item, "Riesgos mas relevantes", "Riesgos más relevantes", "Riesgos") or "",
+                    "control": _pick(item, "Acciones de control", "Control") or "",
+                    "start_period": int(start_period or default_start),
+                    "end_period": int(end_period or start_period or default_end),
                 }
             )
 
@@ -334,6 +359,7 @@ def parse_imported_workbook(file_bytes: bytes) -> ImportedWorkbook:
         project=project_data,
         roles=roles,
         deliverables=deliverables,
+        schedule=schedule,
         threats=threats,
         safeguards=safeguards,
         assets=assets,
