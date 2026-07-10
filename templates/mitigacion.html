@@ -1,109 +1,139 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="module-hero mb-4">
-  <div class="module-toolbar">
-    <div class="text-start">
-      <h1 class="mb-0 fw-bold">Planes de mitigacion</h1>
+<div class="row">
+  <div class="col-12">
+    <div class="card card-outline card-primary">
+      <div class="card-header py-2">
+        <h3 class="card-title mb-0">Seguimiento de mitigación</h3>
+        <div class="card-tools">
+          <button
+            class="btn btn-primary btn-sm"
+            type="button"
+            data-open-modal="#mitigationModal"
+            data-reset-modal="#mitigationModal"
+            data-action="{{ url_for('mitigacion') }}"
+            data-title="Nuevo plan"
+            data-submit-label="Guardar plan"
+          >
+            <i class="bi bi-plus-lg me-1"></i>Plan
+          </button>
+        </div>
+      </div>
+      <div class="card-body table-responsive p-0">
+        <table id="mitigationsTable" class="table table-striped table-hover align-middle mb-0 datatable">
+          <thead>
+            <tr>
+              <th>Riesgo</th>
+              <th>Acción preventiva</th>
+              <th>Acción correctiva / contingencia</th>
+              <th>Disparador</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for mitigation in current_mitigations %}
+              <tr>
+                <td class="fw-semibold">{{ mitigation.risk_name or mitigation.risk_label or "-" }}</td>
+                <td>{{ mitigation.preventive_action or "-" }}</td>
+                <td>{{ mitigation.corrective_action or "-" }}</td>
+                <td>{{ mitigation.trigger or "-" }}</td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2">
+                    <button
+                      class="btn btn-outline-primary btn-sm"
+                      type="button"
+                      data-open-modal="#mitigationModal"
+                      data-action="{{ url_for('mitigacion') }}"
+                      data-title="Editar plan"
+                      data-submit-label="Actualizar plan"
+                      data-mitigation-id="{{ mitigation.id }}"
+                      data-risk-id="{{ mitigation.risk_id or '' }}"
+                      data-risk-name="{{ mitigation.risk_name|e }}"
+                      data-preventive-action="{{ mitigation.preventive_action|e }}"
+                      data-corrective-action="{{ mitigation.corrective_action|e }}"
+                      data-trigger="{{ mitigation.trigger|e }}"
+                    >
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <form method="post" action="{{ url_for('delete_mitigation_route', mitigation_id=mitigation.id) }}" class="d-inline js-confirm-delete" data-delete-label="el plan">
+                      <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="5" class="text-center text-secondary py-4">No hay planes de mitigación para el proyecto seleccionado.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-    <div class="d-flex gap-2 flex-wrap justify-content-end">
-      <button class="btn btn-accent" type="button" data-open-modal="#mitigationModal" data-reset-modal="#mitigationModal"
-            data-action="{{ url_for('mitigacion') }}" data-title="Nuevo plan" data-submit-label="Guardar plan">
-        <i class="bi bi-plus-lg me-1"></i>Plan
-      </button>
-    </div>
   </div>
-</section>
+</div>
 
-<section class="panel-soft">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="section-title mb-0">Seguimiento de mitigacion</h2>
-    <span class="module-chip">{{ current_mitigations|length }} registros</span>
-  </div>
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const table = document.getElementById("mitigationsTable");
+    if (!table || !window.jQuery || !jQuery.fn?.DataTable || jQuery.fn.DataTable.isDataTable(table)) return;
 
-  <div class="table-responsive">
-        <table class="table soft-table align-middle datatable">
-      <thead>
-        <tr>
-          <th>Codigo</th>
-          <th>Riesgo</th>
-          <th>Responsable</th>
-          <th>Estado</th>
-          <th>Avance</th>
-          <th>Fechas</th>
-          <th class="text-end">Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for mitigation in current_mitigations %}
-          <tr>
-            <td>{{ mitigation.code }}</td>
-            <td>
-              <div class="fw-semibold">{{ mitigation.risk_name or mitigation.risk_label or "-" }}</div>
-              <div class="text-secondary small">{{ mitigation.strategy or "-" }}</div>
-            </td>
-            <td>{{ mitigation.owner or "-" }}</td>
-            <td>{{ mitigation.status or "-" }}</td>
-            <td style="min-width: 10rem;">
-              <div class="progress" style="height: .6rem;">
-                <div class="progress-bar" style="width: {{ mitigation.progress or 0 }}%"></div>
-              </div>
-              <div class="text-secondary small mt-1">{{ mitigation.progress or 0 }}%</div>
-            </td>
-            <td class="small text-secondary">
-              {{ mitigation.start_date or "-" }}<br>
-              {{ mitigation.end_date or "-" }}
-            </td>
-            <td class="text-end">
-              <div class="d-inline-flex gap-2">
-                <button
-                  class="btn btn-sm btn-glass"
-                  type="button"
-                  data-open-modal="#mitigationModal"
-                  data-action="{{ url_for('mitigacion') }}"
-                  data-title="Editar plan"
-                  data-submit-label="Actualizar plan"
-                  data-mitigation-id="{{ mitigation.id }}"
-                  data-risk-id="{{ mitigation.risk_id or '' }}"
-                  data-risk-name="{{ mitigation.risk_name|e }}"
-                  data-preventive-action="{{ mitigation.preventive_action|e }}"
-                  data-corrective-action="{{ mitigation.corrective_action|e }}"
-                  data-owner="{{ mitigation.owner|e }}"
-                  data-start-date="{{ mitigation.start_date|e }}"
-                  data-end-date="{{ mitigation.end_date|e }}"
-                  data-resources="{{ mitigation.resources|e }}"
-                  data-status="{{ mitigation.status|e }}"
-                  data-evidence="{{ mitigation.evidence|e }}"
-                  data-strategy="{{ mitigation.strategy|e }}"
-                  data-progress="{{ mitigation.progress if mitigation.progress is not none else 0 }}"
-                >
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <form method="post" action="{{ url_for('delete_mitigation_route', mitigation_id=mitigation.id) }}" class="d-inline js-confirm-delete" data-delete-label="el plan {{ mitigation.code }}">
-                  <button class="btn btn-sm btn-glass" type="submit"><i class="bi bi-trash"></i></button>
-                </form>
-              </div>
-            </td>
-          </tr>
-        {% else %}
-          <tr>
-            <td colspan="7" class="text-center text-secondary py-4">No hay planes de mitigacion para el proyecto seleccionado.</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
+    const headerCount = table.querySelectorAll("thead th").length;
+    const bodyRows = Array.from(table.tBodies[0]?.rows || []);
+    const hasRealRows = bodyRows.some((row) => row.cells.length !== 1 || row.cells[0].colSpan < headerCount);
+    if (!hasRealRows) return;
+
+    jQuery(table).DataTable({
+      paging: false,
+      autoWidth: false,
+      scrollY: "calc(65vh)",
+      scrollCollapse: false,
+      order: [],
+      dom: "<'d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3'Bf>rt<'d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3'i>",
+      buttons: [
+        { extend: "copyHtml5", text: '<i class="bi bi-clipboard me-1"></i>Copiar', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Copiar" },
+        { extend: "csvHtml5", text: '<i class="bi bi-filetype-csv me-1"></i>CSV', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "CSV" },
+        { extend: "excelHtml5", text: '<i class="bi bi-file-earmark-excel me-1"></i>Excel', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Excel" },
+        { extend: "pdfHtml5", text: '<i class="bi bi-file-earmark-pdf me-1"></i>PDF', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "PDF" },
+        { extend: "print", text: '<i class="bi bi-printer me-1"></i>Imprimir', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Imprimir" },
+        { extend: "colvis", text: '<i class="bi bi-layout-three-columns me-1"></i>Columnas', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Columnas" },
+      ],
+      language: {
+        search: "Buscar:",
+        lengthMenu: "Mostrar _MENU_ registros",
+        info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+        infoEmpty: "Sin registros disponibles",
+        infoFiltered: "(filtrado de _MAX_ registros totales)",
+        zeroRecords: "No se encontraron coincidencias",
+        paginate: {
+          first: "Primero",
+          last: "Ultimo",
+          next: "Siguiente",
+          previous: "Anterior",
+        },
+      },
+      initComplete() {
+        const wrapper = this.api().table().container();
+        wrapper.querySelector(".dt-buttons")?.classList.add("d-flex", "flex-wrap", "gap-2");
+        wrapper.querySelectorAll(".dt-buttons .btn").forEach((btn) => btn.classList.add("me-1", "mb-1"));
+      },
+    });
+  });
+</script>
+{% endblock %}
 
 <div class="modal fade" id="mitigationModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content bg-dark text-white border border-secondary">
-      <div class="modal-header border-secondary">
+    <div class="modal-content shadow border-0 rounded-4">
+      <div class="modal-header">
         <h5 class="modal-title" data-modal-title>Nuevo plan</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <form method="post" action="{{ url_for('mitigacion') }}">
         <div class="modal-body">
           <input type="hidden" name="mitigation_id" data-field="mitigation-id">
+          <input type="hidden" name="risk_name" data-field="risk-name">
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label">Riesgo</label>
@@ -115,60 +145,22 @@
               </select>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Responsable</label>
-              <input class="form-control" name="owner" data-field="owner" placeholder="Area TI">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Accion preventiva</label>
+              <label class="form-label">Acción preventiva</label>
               <textarea class="form-control" name="preventive_action" rows="2" data-field="preventive-action"></textarea>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Accion correctiva</label>
+              <label class="form-label">Acción correctiva / contingencia</label>
               <textarea class="form-control" name="corrective_action" rows="2" data-field="corrective-action"></textarea>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Inicio</label>
-              <input class="form-control" type="date" name="start_date" data-field="start-date" data-default-value="{{ today_iso }}" value="{{ today_iso }}">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Fin</label>
-              <input class="form-control" type="date" name="end_date" data-field="end-date" data-default-value="{{ default_end_date_iso }}" value="{{ default_end_date_iso }}">
-            </div>
             <div class="col-md-6">
-              <label class="form-label">Recursos</label>
-              <input class="form-control" name="resources" data-field="resources" placeholder="Horas, presupuesto, equipo">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Estado</label>
-              <select class="form-select" name="status" data-field="status">
-                <option value="Planificado">Planificado</option>
-                <option value="En curso">En curso</option>
-                <option value="Bloqueado">Bloqueado</option>
-                <option value="Completado">Completado</option>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Estrategia</label>
-              <select class="form-select" name="strategy" data-field="strategy">
-                <option value="Evitar">Evitar</option>
-                <option value="Mitigar">Mitigar</option>
-                <option value="Transferir">Transferir</option>
-                <option value="Aceptar">Aceptar</option>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Avance</label>
-              <input class="form-control" type="number" min="0" max="100" step="1" name="progress" data-field="progress" value="0">
-            </div>
-            <div class="col-12">
-              <label class="form-label">Evidencia</label>
-              <input class="form-control" name="evidence" data-field="evidence" placeholder="Enlace o referencia">
+              <label class="form-label">Disparador</label>
+              <textarea class="form-control" name="trigger" rows="2" data-field="trigger"></textarea>
             </div>
           </div>
         </div>
-        <div class="modal-footer border-secondary">
-          <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-accent" data-submit-label>Guardar plan</button>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" data-submit-label>Guardar plan</button>
         </div>
       </form>
     </div>

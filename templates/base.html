@@ -3,101 +3,176 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ title or "Sistema de Gestion de Riesgos" }}</title>
-  <meta name="description" content="Sistema modular de gestion de riesgos en Flask.">
+  <meta name="color-scheme" content="light">
+  <title>{{ title or "Sistema de Gestión de Riesgos" }}</title>
+  <meta name="description" content="Sistema modular de gestión de riesgos en Flask.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
   <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='adminlte/css/adminlte.min.css') }}">
+  <style>
+    .dt-buttons .btn {
+      white-space: nowrap;
+    }
+  </style>
   {% block extra_head %}{% endblock %}
 </head>
-<body>
-  <div class="app-shell module-page">
-    <div class="bg-orb orb-one"></div>
-    <div class="bg-orb orb-two"></div>
-    <div class="bg-grid"></div>
-
-    <nav class="navbar navbar-expand-lg navbar-dark topbar px-3 px-lg-4 py-3">
-      <div class="container-fluid p-0 gap-3">
-        <button class="btn btn-glass d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
-          <i class="bi bi-list"></i>
-        </button>
-
-        <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="{{ url_for('index') }}">
-          <span>Sistema para la Gestión de Proyectos</span>
-        </a>
-
-        <form class="project-switcher ms-lg-auto" method="post" action="{{ url_for('select_project') }}">
-          <input type="hidden" name="next" value="{{ request.path }}">
-          
-          <div class="d-flex gap-2 align-items-center">
-            <select id="projectSwitcher" name="project_id" class="form-select form-select-glass" {% if not projects %}disabled{% endif %}>
-              {% if projects %}
-                {% for project in projects %}
-                  <option value="{{ project.id }}" {% if current_project and current_project.id == project.id %}selected{% endif %}>
-                    {{ project.code }} - {{ project.name }}
-                  </option>
-                {% endfor %}
-              {% else %}
-                <option selected>No hay proyectos</option>
-              {% endif %}
-            </select>
-            <a class="btn btn-glass" href="{{ url_for('proyectos') }}">
-              <i class="bi bi-kanban me-1"></i> 
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
+  <div class="app-wrapper">
+    <nav class="app-header navbar navbar-expand bg-body border-bottom">
+      <div class="container-fluid">
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button" aria-label="Alternar menu">
+              <i class="bi bi-list"></i>
             </a>
-          </div>
-        </form>
+          </li>
+        </ul>
+
+        <ul class="navbar-nav ms-auto align-items-center gap-2">
+          <li class="nav-item d-none d-lg-block">
+            <form class="d-flex align-items-center gap-2" method="post" action="{{ url_for('select_project') }}">
+              <input type="hidden" name="next" value="{{ request.path }}">
+              <label for="projectSwitcher" class="small text-secondary text-nowrap mb-0">Proyecto</label>
+              <select id="projectSwitcher" name="project_id" class="form-select form-select-sm w-auto" {% if not projects %}disabled{% endif %}>
+                {% if projects %}
+                  {% for project in projects %}
+                    <option value="{{ project.id }}" {% if current_project and current_project.id == project.id %}selected{% endif %}>
+                      {{ project.code }} - {{ project.name }}
+                    </option>
+                  {% endfor %}
+                {% else %}
+                  <option selected>No hay proyectos</option>
+                {% endif %}
+              </select>
+            </form>
+          </li>
+          <li class="nav-item">
+            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('proyectos') }}">
+              <i class="bi bi-kanban me-1"></i> Proyectos
+            </a>
+          </li>
+        </ul>
       </div>
     </nav>
 
-    <div class="container-fluid px-3 px-lg-4 pb-4">
-      <div class="row g-4">
-        <aside class="col-lg-3 col-xl-2">
-          <div class="offcanvas-lg offcanvas-start sidebar-panel" tabindex="-1" id="sidebar" aria-labelledby="sidebarLabel">
-            <div class="offcanvas-header d-lg-none">
-              <h5 id="sidebarLabel" class="mb-0">Modulos</h5>
-              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
-            </div>
-
-            <div class="offcanvas-body p-0">
-              <div class="glass-card sidebar-card h-100">
-                <div class="sidebar-section">
-                  <div class="sidebar-label">Modulos</div>
-                  <a href="{{ url_for('proyectos') }}" class="side-link {% if active_page == 'proyectos' %}active{% endif %}">
-                    <i class="bi bi-kanban"></i> Proyectos
-                  </a>     
-                  <a href="{{ url_for('activos') }}" class="side-link {% if active_page == 'activos' %}active{% endif %}">
-                    <i class="bi bi-box-seam"></i> Activos
-                  </a>                               
-                  <a href="{{ url_for('riesgos') }}" class="side-link {% if active_page == 'riesgos' %}active{% endif %}">
-                    <i class="bi bi-exclamation-triangle"></i> Riesgos
-                  </a>
-                  <a href="{{ url_for('matriz') }}" class="side-link {% if active_page == 'matriz' %}active{% endif %}">
-                    <i class="bi bi-bullseye"></i> Matriz
-                  </a>
-                  <a href="{{ url_for('mitigacion') }}" class="side-link {% if active_page == 'mitigacion' %}active{% endif %}">
-                    <i class="bi bi-tools"></i> Mitigacion
-                  </a>
-                  <a href="{{ url_for('reportes') }}" class="side-link {% if active_page == 'reportes' %}active{% endif %}">
-                    <i class="bi bi-graph-up-arrow"></i> Reportes
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        <main class="col-lg-9 col-xl-10">
-          {% block content %}{% endblock %}
-        </main>
+    <aside class="app-sidebar bg-body shadow" data-bs-theme="dark">
+      <div class="sidebar-brand">
+        <a href="{{ url_for('proyectos') }}" class="brand-link">
+          <span class="brand-text fw-semibold">Gestión de Proyectos</span>
+        </a>
       </div>
-    </div>
+
+      <div class="sidebar-wrapper">
+        <nav class="mt-2">
+          <ul
+            class="nav sidebar-menu flex-column"
+            data-lte-toggle="treeview"
+            role="navigation"
+            aria-label="Main navigation"
+            data-accordion="false"
+            id="navigation"
+          >
+            <li class="nav-header">Módulos</li>
+            <li class="nav-item">
+              <a href="{{ url_for('proyectos') }}" class="nav-link {% if active_page == 'proyectos' %}active{% endif %}">
+                <i class="nav-icon bi bi-kanban"></i>
+                <p>Proyectos</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="{{ url_for('activos') }}" class="nav-link {% if active_page == 'activos' %}active{% endif %}">
+                <i class="nav-icon bi bi-box-seam"></i>
+                <p>Activos</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="{{ url_for('cronograma') }}" class="nav-link {% if active_page == 'cronograma' %}active{% endif %}">
+                <i class="nav-icon bi bi-calendar2-week"></i>
+                <p>Cronograma</p>
+              </a>
+            </li>
+            <li class="nav-item {% if active_page in ['riesgos', 'roles', 'amenazas', 'matriz', 'mitigacion'] %}menu-open{% endif %}">
+              <a href="#" class="nav-link {% if active_page in ['riesgos', 'roles', 'amenazas', 'matriz', 'mitigacion'] %}active{% endif %}">
+                <i class="nav-icon bi bi-exclamation-triangle"></i>
+                <p>
+                  Riesgos
+                  <i class="nav-arrow bi bi-chevron-right"></i>
+                </p>
+              </a>
+              <ul class="nav nav-treeview">
+                <li class="nav-item">
+                  <a href="{{ url_for('riesgos') }}" class="nav-link {% if active_page == 'riesgos' %}active{% endif %}">
+                    <i class="nav-icon bi bi-circle"></i>
+                    <p>Lista de riesgos</p>
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a href="{{ url_for('roles') }}" class="nav-link {% if active_page == 'roles' %}active{% endif %}">
+                    <i class="nav-icon bi bi-circle"></i>
+                    <p>Roles del proyecto</p>
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a href="{{ url_for('amenazas') }}" class="nav-link {% if active_page == 'amenazas' %}active{% endif %}">
+                    <i class="nav-icon bi bi-circle"></i>
+                    <p>Amenazas y salvaguardas</p>
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a href="{{ url_for('matriz') }}" class="nav-link {% if active_page == 'matriz' %}active{% endif %}">
+                    <i class="nav-icon bi bi-circle"></i>
+                    <p>Matriz de riesgos</p>
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a href="{{ url_for('mitigacion') }}" class="nav-link {% if active_page == 'mitigacion' %}active{% endif %}">
+                    <i class="nav-icon bi bi-circle"></i>
+                  <p>Mitigación de Riesgos</p>
+                  </a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a href="{{ url_for('reportes') }}" class="nav-link {% if active_page == 'reportes' %}active{% endif %}">
+                <i class="nav-icon bi bi-graph-up-arrow"></i>
+                <p>Reportes</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="{{ url_for('pdf_proyecto') }}" class="nav-link {% if active_page == 'pdf_proyecto' %}active{% endif %}">
+                <i class="nav-icon bi bi-file-earmark-pdf"></i>
+                <p>PDF del proyecto</p>
+              </a>
+            </li>            
+          </ul>
+        </nav>
+      </div>
+    </aside>
+
+    <main class="app-main">
+      <div class="app-content-header p-0">
+        <div class="container-fluid">
+          <div class="row align-items-center">
+            <div class="col-sm-6">
+              <h3 class="mb-0">{{ title or "Sistema de Gestión de Riesgos" }}</h3>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="app-content">
+        <div class="container-fluid">
+          {% block content %}{% endblock %}
+        </div>
+      </div>
+    </main>
   </div>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -111,25 +186,29 @@
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.colVis.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='adminlte/js/adminlte.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
   <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content bg-dark text-white border border-secondary">
-        <div class="modal-header border-secondary">
-          <h5 class="modal-title">Confirmar eliminacion</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      <div class="modal-content shadow border-0">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirmar eliminación</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
-          Esta accion eliminara <strong data-delete-action>este registro</strong> y no se puede deshacer.
+          Esta acción eliminará <strong data-delete-action>este registro</strong> y no se puede deshacer.
         </div>
-        <div class="modal-footer border-secondary">
-          <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Cancelar</button>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button type="button" class="btn btn-danger" data-delete-confirm>Eliminar</button>
         </div>
       </div>
     </div>
   </div>
+
   {% if flash_messages %}
   <script>
     document.addEventListener("DOMContentLoaded", () => {

@@ -100,6 +100,14 @@ def _normalize_header(value: Any) -> str:
     return "".join(char for char in text if not unicodedata.combining(char))
 
 
+def _normalize_lookup(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    text = str(value).strip().lower()
+    text = unicodedata.normalize("NFKD", text)
+    return "".join(char for char in text if not unicodedata.combining(char) and char.isalnum())
+
+
 def _row_map(headers: list[Any], row: list[Any]) -> dict[str, Any]:
     mapped: dict[str, Any] = {}
     for index, header in enumerate(headers):
@@ -120,6 +128,9 @@ def _pick(mapped: dict[str, Any], *aliases: str, default: Any = None) -> Any:
 @dataclass
 class ImportedWorkbook:
     project: dict[str, Any] | None
+    roles: list[dict[str, Any]]
+    threats: list[dict[str, Any]]
+    safeguards: list[dict[str, Any]]
     assets: list[dict[str, Any]]
     risks: list[dict[str, Any]]
     mitigations: list[dict[str, Any]]
@@ -159,6 +170,60 @@ def parse_imported_workbook(file_bytes: bytes) -> ImportedWorkbook:
                 "status": _pick(mapped, "Estado", "Status") or "Activo",
             }
 
+    roles: list[dict[str, Any]] = []
+    if "Roles" in wb.sheetnames:
+        ws = wb["Roles"]
+        rows = _sheet_rows(ws, wb, start_row=2)
+        headers = rows[0] if rows else []
+        for row in rows[1:]:
+            item = _row_map(headers, row)
+            role_name = _pick(item, "Rol", "Role") or ""
+            if not role_name or _normalize_header(role_name) == _normalize_header("Rol"):
+                continue
+            roles.append(
+                {
+                    "role": role_name,
+                    "acquisition_type": _pick(item, "Tipo de adquisicion", "Tipo de adquisición", "Adquisicion") or "",
+                    "risk_participation": _pick(item, "Participacion en riesgos", "Participación en riesgos") or "",
+                }
+            )
+
+    threats: list[dict[str, Any]] = []
+    if "Amenazas" in wb.sheetnames:
+        ws = wb["Amenazas"]
+        rows = _sheet_rows(ws, wb, start_row=2)
+        headers = rows[0] if rows else []
+        for row in rows[1:]:
+            item = _row_map(headers, row)
+            threat_name = _pick(item, "Amenaza", "Threat") or ""
+            if not threat_name:
+                continue
+            threats.append(
+                {
+                    "code": _pick(item, "Codigo", "Código", "Code") or "",
+                    "threat": threat_name,
+                    "affected_asset": _pick(item, "Activo afectado", "Activo", "Activos afectados") or "",
+                    "example": _pick(item, "Ejemplo en el proyecto", "Ejemplo") or "",
+                }
+            )
+
+    safeguards: list[dict[str, Any]] = []
+    if "Salvaguardas" in wb.sheetnames:
+        ws = wb["Salvaguardas"]
+        rows = _sheet_rows(ws, wb, start_row=2)
+        headers = rows[0] if rows else []
+        for row in rows[1:]:
+            item = _row_map(headers, row)
+            safeguard_name = _pick(item, "Salvaguarda propuesta", "Salvaguarda", "Safeguard") or ""
+            if not safeguard_name:
+                continue
+            safeguards.append(
+                {
+                    "threat_name": _pick(item, "Amenaza", "Threat") or "",
+                    "safeguard": safeguard_name,
+                }
+            )
+
     assets: list[dict[str, Any]] = []
     if "Activos" in wb.sheetnames:
         ws = wb["Activos"]
@@ -168,10 +233,10 @@ def parse_imported_workbook(file_bytes: bytes) -> ImportedWorkbook:
             item = _row_map(headers, row)
             assets.append(
                 {
-                    "name": _pick(item, "Nombre del activo", "Nombre", "Activo") or "",
-                    "type": _pick(item, "Tipo") or "",
+                    "name": _pick(item, "Activo", "Nombre del activo", "Nombre") or "",
+                    "type": _pick(item, "Tipo de activo", "Tipo") or "",
                     "owner": _pick(item, "Responsable") or "",
-                    "value": _pick(item, "Valor del activo", "Valor") or 0,
+                    "value": _pick(item, "Valor para el proyecto", "Valor del activo", "Valor") or "",
                     "status": _pick(item, "Estado", "Status") or "Activo",
                 }
             )
@@ -200,6 +265,14 @@ def parse_imported_workbook(file_bytes: bytes) -> ImportedWorkbook:
                 }
             )
 
+    asset_names = {_normalize_lookup(asset["name"]) for asset in assets if asset.get("name")}
+    for risk in risks:
+        asset_name = risk.get("asset_name") or ""
+        if asset_name and _normalize_lookup(asset_name) not in asset_names:
+            warnings.append(
+                f"Riesgo '{risk.get('name') or ''}' referencia el activo '{asset_name}', pero ese activo no existe en la hoja Activos."
+            )
+
     mitigations: list[dict[str, Any]] = []
     if "Mitigacion" in wb.sheetnames:
         ws = wb["Mitigacion"]
@@ -217,7 +290,15 @@ def parse_imported_workbook(file_bytes: bytes) -> ImportedWorkbook:
                 {
                     "risk_name": _pick(item, "Riesgo") or "",
                     "preventive_action": _pick(item, "Accion preventiva", "Accion Preventiva") or "",
-                    "corrective_action": _pick(item, "Accion correctiva", "Accion Correctiva") or "",
+                    "corrective_action": _pick(
+                        item,
+                        "Accion correctiva / contingencia",
+                        "Accion correctiva",
+                        "Accion Correctiva",
+                        "Contingencia",
+                    )
+                    or "",
+                    "trigger": _pick(item, "Disparador") or "",
                     "owner": _pick(item, "Responsable") or "",
                     "start_date": start_date,
                     "end_date": end_date,
@@ -229,4 +310,13 @@ def parse_imported_workbook(file_bytes: bytes) -> ImportedWorkbook:
                 }
             )
 
-    return ImportedWorkbook(project=project_data, assets=assets, risks=risks, mitigations=mitigations, warnings=warnings)
+    return ImportedWorkbook(
+        project=project_data,
+        roles=roles,
+        threats=threats,
+        safeguards=safeguards,
+        assets=assets,
+        risks=risks,
+        mitigations=mitigations,
+        warnings=warnings,
+    )

@@ -3,250 +3,135 @@
 <style>
   .chart-shell {
     height: 460px;
-    border-radius: 0.75rem;
-    overflow: hidden;
-    background: #111827;
-    border: 1px solid #1f2937;
-    padding: 12px;
+    background: #0b0f19;
   }
 </style>
 {% endblock %}
 {% block content %}
 {% set ns = namespace(low=0, medium=0, high=0, critical=0) %}
 {% for risk in matrix_risks %}
-  {% if (risk.level or 'Bajo') == 'Bajo' %}
+  {% set level_key = (risk.level or 'Bajo')|lower|replace('í', 'i')|replace('á', 'a') %}
+  {% if level_key == 'bajo' %}
     {% set ns.low = ns.low + 1 %}
-  {% elif (risk.level or 'Bajo') == 'Medio' %}
+  {% elif level_key == 'medio' %}
     {% set ns.medium = ns.medium + 1 %}
-  {% elif (risk.level or 'Bajo') == 'Alto' %}
+  {% elif level_key in ['alto', 'alta'] %}
     {% set ns.high = ns.high + 1 %}
   {% else %}
     {% set ns.critical = ns.critical + 1 %}
   {% endif %}
 {% endfor %}
 
-<section class="module-hero mb-4">
-  <div class="module-toolbar">
-    <div class="text-start">
-      <h1 class="mb-0 fw-bold">Matriz de riesgo</h1>
+<div class="row g-3 m-0">
+  <div class="col-6 col-xl-3">
+    <div class="small-box text-bg-success mb-2">
+      <div class="inner">
+        <h3>{{ ns.low }}</h3>
+        <p>Bajo</p>
+      </div>
+      <i class="bi bi-shield-check small-box-icon"></i>
     </div>
-    <div></div>
   </div>
-</section>
-
-<div class="metric-grid mb-4">
-  <div class="metric-tile">
-    <div class="metric-label">Bajo</div>
-    <div class="metric-number">{{ ns.low }}</div>
+  <div class="col-6 col-xl-3">
+    <div class="small-box text-bg-warning mb-2">
+      <div class="inner">
+        <h3>{{ ns.medium }}</h3>
+        <p>Medio</p>
+      </div>
+      <i class="bi bi-exclamation-triangle small-box-icon"></i>
+    </div>
   </div>
-  <div class="metric-tile">
-    <div class="metric-label">Medio</div>
-    <div class="metric-number">{{ ns.medium }}</div>
+  <div class="col-6 col-xl-3">
+    <div class="small-box text-bg-danger mb-2">
+      <div class="inner">
+        <h3>{{ ns.high }}</h3>
+        <p>Alto</p>
+      </div>
+      <i class="bi bi-fire small-box-icon"></i>
+    </div>
   </div>
-  <div class="metric-tile">
-    <div class="metric-label">Alto</div>
-    <div class="metric-number">{{ ns.high }}</div>
-  </div>
-  <div class="metric-tile">
-    <div class="metric-label">Critico</div>
-    <div class="metric-number">{{ ns.critical }}</div>
+  <div class="col-6 col-xl-3">
+    <div class="small-box text-bg-primary mb-2">
+      <div class="inner">
+        <h3>{{ ns.critical }}</h3>
+        <p>Crítico</p>
+      </div>
+      <i class="bi bi-bullseye small-box-icon"></i>
+    </div>
   </div>
 </div>
 
-<section class="panel-soft">
-  <ul class="nav nav-pills gap-2 mb-4" id="matrixTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active btn btn-glass" id="list-tab" data-bs-toggle="tab" data-bs-target="#list-pane" type="button" role="tab" aria-controls="list-pane" aria-selected="true">
-        Listado
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link btn btn-glass" id="heat-tab" data-bs-toggle="tab" data-bs-target="#heat-pane" type="button" role="tab" aria-controls="heat-pane" aria-selected="false">
-        Mapa de calor
-      </button>
-    </li>
-  </ul>
-
-  <div class="tab-content">
-    <div class="tab-pane fade show active" id="list-pane" role="tabpanel" aria-labelledby="list-tab">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="section-title mb-0">Riesgos ubicados</h2>
-        <span class="module-chip">{{ matrix_risks|length }} registros</span>
-      </div>
-
-      <div class="table-responsive">
-        <table class="table soft-table align-middle datatable">
-          <thead>
-            <tr>
-              <th>Codigo</th>
-              <th>Riesgo</th>
-              <th>Activo</th>
-              <th>Probabilidad</th>
-              <th>Impacto</th>
-              <th>Puntaje</th>
-              <th>Nivel</th>
-              <th class="text-end">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for risk in matrix_risks %}
-              {% set score = (risk.probability or 0) * (risk.impact or 0) %}
-              <tr>
-                <td>{{ risk.code }}</td>
-                <td>{{ risk.name }}</td>
-                <td>{{ risk.asset_name or risk.asset_label or "-" }}</td>
-                <td>{{ "%.2f"|format(risk.probability or 0) }}</td>
-                <td>{{ risk.impact or 0 }}</td>
-                <td>{{ "%.2f"|format(score) }}</td>
-                <td>
-                  <span class="status-pill {% if risk.level == 'Bajo' %}status-good{% elif risk.level == 'Medio' %}status-warn{% else %}status-bad{% endif %}">
-                    {{ risk.level or "Bajo" }}
-                  </span>
-                </td>
-                <td class="text-end">
-                  <div class="d-inline-flex gap-2">
-                    <button
-                      class="btn btn-sm btn-glass"
-                      type="button"
-                      data-open-modal="#matrixRiskModal"
-                      data-action="{{ url_for('riesgos') }}"
-                      data-title="Editar riesgo"
-                      data-submit-label="Actualizar riesgo"
-                      data-risk-id="{{ risk.id }}"
-                      data-asset-id="{{ risk.asset_id or '' }}"
-                      data-name="{{ risk.name|e }}"
-                      data-description="{{ risk.description|e }}"
-                      data-cause="{{ risk.cause|e }}"
-                      data-consequence="{{ risk.consequence|e }}"
-                      data-probability="{{ risk.probability if risk.probability is not none else 0 }}"
-                      data-impact="{{ risk.impact if risk.impact is not none else 0 }}"
-                      data-level="{{ risk.level|e }}"
-                      data-horizon="{{ risk.horizon|e }}"
-                      data-owner="{{ risk.owner|e }}"
-                      data-status="{{ risk.status|e }}"
-                      data-strategy="{{ risk.strategy|e }}"
-                    >
-                      <i class="bi bi-pencil"></i>
-                    </button>
-                    <form method="post" action="{{ url_for('delete_risk_route', risk_id=risk.id) }}" class="d-inline js-confirm-delete" data-delete-label="el riesgo {{ risk.code }}">
-                      <button class="btn btn-sm btn-glass" type="submit"><i class="bi bi-trash"></i></button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            {% else %}
-              <tr>
-                <td colspan="8" class="text-center text-secondary py-4">No hay riesgos para la matriz del proyecto seleccionado.</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="tab-pane fade" id="heat-pane" role="tabpanel" aria-labelledby="heat-tab">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="section-title mb-0">Mapa de calor</h2>
-        <span class="module-chip">Probabilidad vs impacto</span>
-      </div>
-      <div class="chart-shell">
-        <canvas id="heatChart"></canvas>
-      </div>
-      <p class="text-secondary small mt-3 mb-0">
-        El color de cada punto representa el nivel de riesgo calculado a partir de la probabilidad e impacto.
-      </p>
-    </div>
+<div class="card card-outline card-primary card-tabs">
+  <div class="card-header p-0 pt-1">
+    <ul class="nav nav-tabs" id="matrixTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="list-tab" data-bs-toggle="tab" data-bs-target="#list-pane" type="button" role="tab" aria-controls="list-pane" aria-selected="true">
+          Listado
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="heat-tab" data-bs-toggle="tab" data-bs-target="#heat-pane" type="button" role="tab" aria-controls="heat-pane" aria-selected="false">
+          Mapa de calor
+        </button>
+      </li>
+    </ul>
   </div>
-</section>
-
-<div class="modal fade" id="matrixRiskModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content bg-dark text-white border border-secondary">
-      <div class="modal-header border-secondary">
-        <h5 class="modal-title" data-modal-title>Nuevo riesgo</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+  <div class="card-body">
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="list-pane" role="tabpanel" aria-labelledby="list-tab">
+        <div class="table-responsive">
+          <table id="matrixRisksTable" class="table table-striped table-hover align-middle datatable mb-0">
+            <thead>
+              <tr>
+                <th>Riesgo</th>
+                <th>Activo afectado</th>
+                <th>Probabilidad</th>
+                <th>Impacto</th>
+                <th>Puntaje</th>
+                <th>Nivel</th>
+                <th>Prioridad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for risk in matrix_risks %}
+                {% set score = (risk.probability or 0) * (risk.impact or 0) %}
+                {% set level_key = (risk.level or 'Bajo')|lower|replace('í', 'i')|replace('á', 'a') %}
+                {% set priority = 'Crítica' if level_key in ['critico', 'critica'] else 'Alta' if level_key in ['alto', 'alta'] else 'Moderada' if level_key == 'medio' else 'Baja' %}
+                <tr>
+                  <td>{{ risk.name }}</td>
+                  <td>{{ risk.asset_name or risk.asset_label or '-' }}</td>
+                  <td>{{ "%.2f"|format(risk.probability or 0) }}</td>
+                  <td>{{ risk.impact or 0 }}</td>
+                  <td>{{ "%.2f"|format(score) }}</td>
+                  <td>
+                    <span class="badge {% if level_key == 'bajo' %}text-bg-success{% elif level_key == 'medio' %}text-bg-warning{% elif level_key in ['alto', 'alta'] %}text-bg-danger{% else %}text-bg-primary{% endif %}">
+                      {{ risk.level or "Bajo" }}
+                    </span>
+                  </td>
+                  <td>{{ priority }}</td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="7" class="text-center text-secondary py-4">No hay riesgos para la matriz del proyecto seleccionado.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
-      <form method="post" action="{{ url_for('riesgos') }}">
-        <div class="modal-body">
-          <input type="hidden" name="risk_id" data-field="risk-id">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Activo</label>
-              <select class="form-select" name="asset_id" data-field="asset-id">
-                <option value="">Selecciona un activo</option>
-                {% for asset in asset_options %}
-                  <option value="{{ asset.id }}">{{ asset.code }} - {{ asset.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Riesgo</label>
-              <input class="form-control" name="name" data-field="name" placeholder="Caida de API">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Descripcion</label>
-              <textarea class="form-control" name="description" rows="2" data-field="description"></textarea>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Causa</label>
-              <textarea class="form-control" name="cause" rows="2" data-field="cause"></textarea>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Consecuencia</label>
-              <textarea class="form-control" name="consequence" rows="2" data-field="consequence"></textarea>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Probabilidad</label>
-              <input class="form-control" name="probability" type="number" min="0" max="1" step="0.05" data-field="probability" value="0">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Impacto</label>
-              <input class="form-control" name="impact" type="number" min="0" max="100" step="1" data-field="impact" value="0">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Nivel</label>
-              <input class="form-control" name="level" data-field="level" placeholder="Auto">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Horizonte</label>
-              <select class="form-select" name="horizon" data-field="horizon">
-                <option value="">Selecciona</option>
-                <option value="Corto">Corto</option>
-                <option value="Medio">Medio</option>
-                <option value="Largo">Largo</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Responsable</label>
-              <input class="form-control" name="owner" data-field="owner" placeholder="Area TI">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Estado</label>
-              <select class="form-select" name="status" data-field="status">
-                <option value="Identificado">Identificado</option>
-                <option value="Evaluado">Evaluado</option>
-                <option value="En tratamiento">En tratamiento</option>
-                <option value="Mitigado">Mitigado</option>
-                <option value="Aceptado">Aceptado</option>
-                <option value="Cerrado">Cerrado</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Estrategia</label>
-              <select class="form-select" name="strategy" data-field="strategy">
-                <option value="Evitar">Evitar</option>
-                <option value="Mitigar">Mitigar</option>
-                <option value="Transferir">Transferir</option>
-                <option value="Aceptar">Aceptar</option>
-              </select>
-            </div>
-          </div>
+
+      <div class="tab-pane fade" id="heat-pane" role="tabpanel" aria-labelledby="heat-tab">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <h3 class="h5 mb-0">Mapa de calor</h3>
+          <span class="badge text-bg-primary">Probabilidad vs impacto</span>
         </div>
-        <div class="modal-footer border-secondary">
-          <button type="button" class="btn btn-glass" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-accent" data-submit-label>Guardar riesgo</button>
+        <div class="chart-shell border rounded-3 p-3 bg-body">
+          <canvas id="heatChart"></canvas>
         </div>
-      </form>
+        <p class="text-secondary small mt-3 mb-0">
+          El color de cada punto representa el nivel de riesgo calculado a partir de la probabilidad e impacto.
+        </p>
+      </div>
     </div>
   </div>
 </div>
@@ -255,37 +140,73 @@
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
-  const risks = {{ matrix_risks | tojson }};
-  const points = risks.map((risk, index) => {
-    const probability = Number(risk.probability || 0);
-    const impact = Number(risk.impact || 0);
-    const score = probability * impact;
-    const palette = ["#ffffff", "#38bdf8", "#f43f5e", "#4ade80", "#a855f7", "#f97316"];
+  document.addEventListener("DOMContentLoaded", () => {
+    const table = document.getElementById("matrixRisksTable");
+    if (table && window.jQuery && jQuery.fn?.DataTable && !jQuery.fn.DataTable.isDataTable(table)) {
+      const headerCount = table.querySelectorAll("thead th").length;
+      const bodyRows = Array.from(table.tBodies[0]?.rows || []);
+      const hasRealRows = bodyRows.some((row) => row.cells.length !== 1 || row.cells[0].colSpan < headerCount);
+      if (hasRealRows) {
+        jQuery(table).DataTable({
+          paging: false,
+          autoWidth: false,
+          scrollY: "calc(65vh)",
+          scrollCollapse: false,
+          order: [],
+          dom: "<'d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3'Bf>rt<'d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3'i>",
+          buttons: [
+            { extend: "copyHtml5", text: '<i class="bi bi-clipboard me-1"></i>Copiar', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Copiar" },
+            { extend: "csvHtml5", text: '<i class="bi bi-filetype-csv me-1"></i>CSV', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "CSV" },
+            { extend: "excelHtml5", text: '<i class="bi bi-file-earmark-excel me-1"></i>Excel', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Excel" },
+            { extend: "pdfHtml5", text: '<i class="bi bi-file-earmark-pdf me-1"></i>PDF', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "PDF" },
+            { extend: "print", text: '<i class="bi bi-printer me-1"></i>Imprimir', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Imprimir" },
+            { extend: "colvis", text: '<i class="bi bi-layout-three-columns me-1"></i>Columnas', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Columnas" },
+          ],
+          language: {
+            search: "Buscar:",
+            lengthMenu: "Mostrar _MENU_ registros",
+            info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            infoEmpty: "Sin registros disponibles",
+            infoFiltered: "(filtrado de _MAX_ registros totales)",
+            zeroRecords: "No se encontraron coincidencias",
+            paginate: {
+              first: "Primero",
+              last: "Ultimo",
+              next: "Siguiente",
+              previous: "Anterior",
+            },
+          },
+          initComplete() {
+            const wrapper = this.api().table().container();
+            wrapper.querySelector(".dt-buttons")?.classList.add("d-flex", "flex-wrap", "gap-2");
+            wrapper.querySelectorAll(".dt-buttons .btn").forEach((btn) => btn.classList.add("me-1", "mb-1"));
+          },
+        });
+      }
+    }
 
-    return {
-      x: probability,
-      y: impact,
-      label: risk.code || `R-${index + 1}`,
-      name: risk.name || "-",
-      level: risk.level || "Bajo",
-      color: palette[index % palette.length],
-      score,
-    };
-  });
+    const ctx = document.getElementById("heatChart");
+    if (!ctx) return;
 
-  const ctx = document.getElementById("heatChart");
-  if (ctx) {
-    const heatBackground = {
-      id: "heatBackground",
+    const points = [
+      {% for risk in matrix_risks %}
+        {% set score = (risk.probability or 0) * (risk.impact or 0) %}
+        {% set level_key = (risk.level or 'Bajo')|lower|replace('í', 'i')|replace('á', 'a') %}
+        {% set color = '#00b050' if level_key == 'bajo' else '#eab308' if level_key == 'medio' else '#f97316' if level_key in ['alto', 'alta'] else '#ef4444' %}
+        { x: {{ risk.probability or 0 }}, y: {{ risk.impact or 0 }}, label: "{{ risk.name|e }}", color: "{{ color }}" },
+      {% endfor %}
+    ];
+
+    const diagonalHeatBackground = {
+      id: "diagonalHeatBackground",
       beforeDraw(chart) {
         const { ctx, chartArea } = chart;
         if (!chartArea) return;
-
-        const { left, top, right, bottom, width, height } = chartArea;
+        const { left, right, top, bottom, width, height } = chartArea;
         const gradient = ctx.createLinearGradient(left, bottom, right, top);
         gradient.addColorStop(0.0, "#00b050");
         gradient.addColorStop(0.35, "#eab308");
-        gradient.addColorStop(0.7, "#f97316");
+        gradient.addColorStop(0.70, "#f97316");
         gradient.addColorStop(1.0, "#ef4444");
 
         ctx.save();
@@ -295,54 +216,49 @@
       },
     };
 
-    const chart = new Chart(ctx, {
+    new Chart(ctx, {
       type: "scatter",
-      plugins: [heatBackground],
       data: {
         datasets: [{
+          label: "Riesgos",
           data: points,
-          pointRadius: 10,
-          pointHoverRadius: 13,
-          borderWidth: 2,
-          borderColor: "#0b0f19",
+          pointRadius: 8,
+          pointHoverRadius: 10,
           backgroundColor: points.map((point) => point.color),
-        }],
+          borderColor: "#0b0f19",
+          borderWidth: 2,
+        }]
       },
+      plugins: [diagonalHeatBackground],
       options: {
+        responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label(context) {
-                const point = context.raw;
-                return [`${point.label} - ${point.name}`, `Nivel: ${point.level}`, `P: ${point.x.toFixed(2)} | I: ${point.y}`];
-              },
+              label: (context) => `${context.raw.label} (P: ${context.raw.x}, I: ${context.raw.y})`,
             },
           },
         },
         scales: {
           x: {
-            min: 0,
-            max: 1,
-            ticks: { color: "#ffffff" },
+            min: 0.5,
+            max: 5.5,
+            ticks: { stepSize: 1 },
             grid: { color: "rgba(255,255,255,0.12)" },
-            title: { display: true, text: "Probabilidad", color: "#9ca3af" },
+            title: { display: true, text: "Probabilidad", color: "#9ca3af", font: { weight: "bold", size: 12 } },
           },
           y: {
-            min: 0,
-            max: 100,
-            ticks: { color: "#ffffff" },
+            min: 0.5,
+            max: 5.5,
+            ticks: { stepSize: 1 },
             grid: { color: "rgba(255,255,255,0.12)" },
-            title: { display: true, text: "Impacto", color: "#9ca3af" },
+            title: { display: true, text: "Impacto", color: "#9ca3af", font: { weight: "bold", size: 12 } },
           },
         },
-      },
+      }
     });
-
-    document.querySelector('[data-bs-target="#heat-pane"]')?.addEventListener("shown.bs.tab", () => {
-      chart.resize();
-    });
-  }
+  });
 </script>
 {% endblock %}

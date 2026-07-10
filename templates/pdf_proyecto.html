@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-12">
+    <div class="card card-outline card-primary">
+      <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <h3 class="card-title mb-0">PDF del proyecto</h3>
+        <a class="btn btn-primary btn-sm" href="{{ url_for('pdf_proyecto_download') }}">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Generar PDF
+        </a>
+      </div>
+      <div class="card-body">
+        {% set project = report_context.project or {} %}
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="border rounded-3 p-3 bg-body">
+              <div class="text-secondary small text-uppercase fw-semibold mb-1">Proyecto</div>
+              <div class="h5 mb-0">{{ project.name or "-" }}</div>
+              <div class="text-secondary small">{{ project.code or "-" }}</div>
+            </div>
+          </div>
+          <div class="col-lg-8">
+            <div class="row g-3">
+              <div class="col-6 col-xl-3">
+                <div class="small-box text-bg-primary mb-0">
+                  <div class="inner">
+                    <h3>{{ report_context.summary.total }}</h3>
+                    <p>Riesgos</p>
+                  </div>
+                  <i class="bi bi-shield-exclamation small-box-icon"></i>
+                </div>
+              </div>
+              <div class="col-6 col-xl-3">
+                <div class="small-box text-bg-danger mb-0">
+                  <div class="inner">
+                    <h3>{{ report_context.summary.critical }}</h3>
+                    <p>Críticos</p>
+                  </div>
+                  <i class="bi bi-fire small-box-icon"></i>
+                </div>
+              </div>
+              <div class="col-6 col-xl-3">
+                <div class="small-box text-bg-success mb-0">
+                  <div class="inner">
+                    <h3>{{ report_context.summary.mitigated }}</h3>
+                    <p>Mitigados</p>
+                  </div>
+                  <i class="bi bi-check2-circle small-box-icon"></i>
+                </div>
+              </div>
+              <div class="col-6 col-xl-3">
+                <div class="small-box text-bg-warning mb-0">
+                  <div class="inner">
+                    <h3>{{ report_context.summary.progress }}%</h3>
+                    <p>Avance</p>
+                  </div>
+                  <i class="bi bi-graph-up-arrow small-box-icon"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="alert alert-info mb-0">
+              El PDF incluirá proyecto, roles, entregables, activos, amenazas, salvaguardas, riesgos, matriz de riesgos, cronograma visual y mitigaciones.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

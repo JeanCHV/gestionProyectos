@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  .timeline-wrap {
+    overflow-x: auto;
+  }
+  .timeline-grid {
+    min-width: 1180px;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(150px, 1fr));
+    gap: 0.85rem;
+  }
+  .timeline-card {
+    min-height: 100%;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+  .timeline-card .card-head {
+    padding: 0.9rem 0.9rem 0.7rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+  .timeline-card .card-body {
+    padding: 0.8rem 0.9rem 1rem;
+  }
+  .timeline-id {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    background: #1f4e78;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-12">
+    <div class="card card-outline card-primary">
+      <div class="card-header py-2">
+        <h3 class="card-title mb-0">Cronograma del proyecto</h3>
+      </div>
+      <div class="card-body">
+        <ul class="nav nav-tabs mb-3" id="cronogramaTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tabla-tab" data-bs-toggle="tab" data-bs-target="#tabla-pane" type="button" role="tab" aria-controls="tabla-pane" aria-selected="true">Tabla</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="visual-tab" data-bs-toggle="tab" data-bs-target="#visual-pane" type="button" role="tab" aria-controls="visual-pane" aria-selected="false">Vista visual</button>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="tabla-pane" role="tabpanel" aria-labelledby="tabla-tab">
+            <div class="table-responsive">
+              <table id="cronogramaTable" class="table table-striped table-hover align-middle mb-0 datatable">
+                <thead>
+                  <tr>
+                    <th>Fase del cronograma</th>
+                    <th>Riesgos más relevantes</th>
+                    <th>Acciones de control</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for phase in cronograma_phases %}
+                    <tr>
+                      <td class="fw-semibold">{{ phase.phase }}</td>
+                      <td>{{ phase.risks|join(', ') }}</td>
+                      <td>{{ phase.control }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="visual-pane" role="tabpanel" aria-labelledby="visual-tab">
+            <div class="timeline-wrap pb-2">
+              <div class="timeline-grid">
+                {% for phase in cronograma_phases %}
+                  <div class="timeline-card">
+                    <div class="card-head">
+                      <div class="d-flex align-items-start justify-content-between gap-2">
+                        <div>
+                          <div class="text-secondary small text-uppercase fw-semibold mb-1">Fase {{ loop.index }}</div>
+                          <div class="fw-semibold">{{ phase.phase }}</div>
+                        </div>
+                        <span class="timeline-id">F{{ loop.index }}</span>
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      <div class="text-secondary small text-uppercase fw-semibold mb-2">Riesgos</div>
+                      <div class="d-flex flex-wrap gap-1 mb-3">
+                        {% for risk_id in phase.risks %}
+                          <span class="badge text-bg-primary">{{ risk_id }}</span>
+                        {% endfor %}
+                      </div>
+                      <div class="text-secondary small text-uppercase fw-semibold mb-1">Control</div>
+                      <p class="mb-0 small">{{ phase.control }}</p>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+            <p class="text-secondary small mt-3 mb-0">El cronograma visual resume las fases en orden horizontal para lectura rápida del avance y su relación con los riesgos.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const table = document.getElementById("cronogramaTable");
+    if (!table || !window.jQuery || !jQuery.fn?.DataTable || jQuery.fn.DataTable.isDataTable(table)) return;
+
+    const headerCount = table.querySelectorAll("thead th").length;
+    const bodyRows = Array.from(table.tBodies[0]?.rows || []);
+    const hasRealRows = bodyRows.some((row) => row.cells.length !== 1 || row.cells[0].colSpan < headerCount);
+    if (!hasRealRows) return;
+
+    jQuery(table).DataTable({
+      paging: false,
+      autoWidth: false,
+      scrollY: "calc(65vh)",
+      scrollCollapse: false,
+      order: [],
+      dom: "<'d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3'Bf>rt<'d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3'i>",
+      buttons: [
+        { extend: "copyHtml5", text: '<i class="bi bi-clipboard me-1"></i>Copiar', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Copiar" },
+        { extend: "csvHtml5", text: '<i class="bi bi-filetype-csv me-1"></i>CSV', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "CSV" },
+        { extend: "excelHtml5", text: '<i class="bi bi-file-earmark-excel me-1"></i>Excel', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Excel" },
+        { extend: "pdfHtml5", text: '<i class="bi bi-file-earmark-pdf me-1"></i>PDF', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "PDF" },
+        { extend: "print", text: '<i class="bi bi-printer me-1"></i>Imprimir', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Imprimir" },
+        { extend: "colvis", text: '<i class="bi bi-layout-three-columns me-1"></i>Columnas', className: "btn btn-primary btn-sm text-nowrap", titleAttr: "Columnas" },
+      ],
+      language: {
+        search: "Buscar:",
+        lengthMenu: "Mostrar _MENU_ registros",
+        info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+        infoEmpty: "Sin registros disponibles",
+        infoFiltered: "(filtrado de _MAX_ registros totales)",
+        zeroRecords: "No se encontraron coincidencias",
+        paginate: {
+          first: "Primero",
+          last: "Último",
+          next: "Siguiente",
+          previous: "Anterior",
+        },
+      },
+      initComplete() {
+        const wrapper = this.api().table().container();
+        wrapper.querySelector(".dt-buttons")?.classList.add("d-flex", "flex-wrap", "gap-2");
+        wrapper.querySelectorAll(".dt-buttons .btn").forEach((btn) => btn.classList.add("me-1", "mb-1"));
+      },
+    });
+  });
+</script>
+{% endblock %}
