@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import json
+import subprocess
+import tempfile
 import unicodedata
 from io import BytesIO
 from xml.sax.saxutils import escape as xml_escape
@@ -24,7 +27,8 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image as ReportImage
+from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from db import (
     close_db,
@@ -313,7 +317,7 @@ def _build_project_pdf(context: dict[str, Any]) -> bytes:
     for title, data in sections:
         build_section_table(title, data)
 
-    story.append(Paragraph("Matriz de riesgos", section_style))
+    matrix_block: list[Any] = [Paragraph("Matriz de riesgos", section_style)]
     matrix_data = [[p("Riesgo"), p("Activo afectado"), p("P"), p("I"), p("Nivel"), p("Prioridad")]]
     for row in context["matrix_rows"]:
         risk = row["risk"]
@@ -463,7 +467,7 @@ def _project_report_context(project_id: int) -> dict[str, Any]:
         score = float(risk.get("probability") or 0) * float(risk.get("impact") or 0)
         level = (risk.get("level") or "").strip()
         normalized = level.lower()
-        priority = "Crítica" if normalized in {"critico", "crítico"} else "Alta" if normalized == "alto" else "Moderada" if normalized == "medio" else "Baja"
+        priority = "Crítica" if normalized in {"critico", "crítico"} else "Alta" if normalized in {"alto", "alta"} else "Moderada" if normalized == "medio" else "Baja"
         matrix_rows.append({"risk": risk, "score": score, "priority": priority})
 
     return {
@@ -485,14 +489,156 @@ def _project_level_fill(level: str | None) -> colors.Color:
     normalized = (level or "").strip().lower()
     if normalized in {"critico", "crítico"}:
         return colors.HexColor("#ef4444")
-    if normalized == "alto":
+    if normalized in {"alto", "alta"}:
         return colors.HexColor("#f97316")
     if normalized == "medio":
-        return colors.HexColor("#f59e0b")
-    return colors.HexColor("#22c55e")
+        return colors.HexColor("#eab308")
+    return colors.HexColor("#00b050")
+
+
+def _browser_executable() -> str | None:
+    candidates = [
+        Path(os.environ.get("PROGRAMFILES", "")) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", "")) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+        Path(os.environ.get("PROGRAMFILES", "")) / "Google" / "Chrome" / "Application" / "chrome.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", "")) / "Google" / "Chrome" / "Application" / "chrome.exe",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "Application" / "chrome.exe",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def _heatmap_chart_image(context: dict[str, Any], temp_files: list[Path]) -> Path | None:
+    browser = _browser_executable()
+    if not browser:
+        return None
+
+    points = []
+    for risk in context["risks"]:
+        level_key = _lookup_key(risk.get("level") or "Bajo")
+        color = "#00b050" if level_key == "bajo" else "#eab308" if level_key == "medio" else "#f97316" if level_key in {"alto", "alta"} else "#ef4444"
+        points.append(
+            {
+                "x": float(risk.get("probability") or 0),
+                "y": float(risk.get("impact") or 0),
+                "label": _safe_text(risk.get("name")),
+                "color": color,
+            }
+        )
+
+    html = f"""<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    html, body {{ margin: 0; width: 1100px; height: 650px; background: #ffffff; font-family: Arial, sans-serif; }}
+    .frame {{ width: 1040px; height: 590px; padding: 28px 30px; box-sizing: border-box; }}
+    .title {{ color: #1f3b73; font-size: 22px; font-weight: 700; margin: 0 0 16px; }}
+    .chart-shell {{ width: 980px; height: 520px; border: 1px solid #d8dee9; border-radius: 8px; padding: 16px; box-sizing: border-box; background: #ffffff; }}
+    canvas {{ width: 100% !important; height: 100% !important; }}
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="title">Mapa de calor visual</div>
+    <div class="chart-shell"><canvas id="heatChart"></canvas></div>
+  </div>
+  <script>
+    const points = {json.dumps(points, ensure_ascii=False)};
+    const diagonalHeatBackground = {{
+      id: "diagonalHeatBackground",
+      beforeDraw(chart) {{
+        const {{ ctx, chartArea }} = chart;
+        if (!chartArea) return;
+        const {{ left, right, top, bottom, width, height }} = chartArea;
+        const gradient = ctx.createLinearGradient(left, bottom, right, top);
+        gradient.addColorStop(0.0, "#00b050");
+        gradient.addColorStop(0.35, "#eab308");
+        gradient.addColorStop(0.70, "#f97316");
+        gradient.addColorStop(1.0, "#ef4444");
+        ctx.save();
+        ctx.fillStyle = gradient;
+        ctx.fillRect(left, top, width, height);
+        ctx.restore();
+      }},
+    }};
+    new Chart(document.getElementById("heatChart"), {{
+      type: "scatter",
+      data: {{
+        datasets: [{{
+          label: "Riesgos",
+          data: points,
+          pointRadius: 8,
+          pointHoverRadius: 10,
+          backgroundColor: points.map((point) => point.color),
+          borderColor: "#0b0f19",
+          borderWidth: 2,
+        }}]
+      }},
+      plugins: [diagonalHeatBackground],
+      options: {{
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{
+            callbacks: {{
+              label: (context) => `${{context.raw.label}} (P: ${{context.raw.x}}, I: ${{context.raw.y}})`,
+            }},
+          }},
+        }},
+        scales: {{
+          x: {{
+            min: 0.5,
+            max: 5.5,
+            ticks: {{ stepSize: 1 }},
+            grid: {{ color: "rgba(255,255,255,0.12)" }},
+            title: {{ display: true, text: "Probabilidad", color: "#9ca3af", font: {{ weight: "bold", size: 12 }} }},
+          }},
+          y: {{
+            min: 0.5,
+            max: 5.5,
+            ticks: {{ stepSize: 1 }},
+            grid: {{ color: "rgba(255,255,255,0.12)" }},
+            title: {{ display: true, text: "Impacto", color: "#9ca3af", font: {{ weight: "bold", size: 12 }} }},
+          }},
+        }},
+      }}
+    }});
+  </script>
+</body>
+</html>"""
+
+    html_file = Path(tempfile.NamedTemporaryFile(delete=False, suffix=".html").name)
+    png_file = Path(tempfile.NamedTemporaryFile(delete=False, suffix=".png").name)
+    html_file.write_text(html, encoding="utf-8")
+    temp_files.extend([html_file, png_file])
+    command = [
+        browser,
+        "--headless=new",
+        "--disable-gpu",
+        "--no-first-run",
+        "--disable-extensions",
+        "--hide-scrollbars",
+        "--window-size=1100,650",
+        "--virtual-time-budget=2500",
+        f"--screenshot={png_file}",
+        html_file.as_uri(),
+    ]
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+    except (subprocess.SubprocessError, OSError):
+        return None
+    return png_file if png_file.exists() and png_file.stat().st_size > 0 else None
 
 
 def _build_project_pdf_clean(context: dict[str, Any]) -> bytes:
+    temp_files: list[Path] = []
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -569,6 +715,135 @@ def _build_project_pdf_clean(context: dict[str, Any]) -> bytes:
         story.append(table)
         story.append(Spacer(1, 5))
 
+    def heat_color(probability: int, impact: int) -> colors.Color:
+        score = probability * impact
+        if score >= 16:
+            return colors.HexColor("#ef4444")
+        if score >= 11:
+            return colors.HexColor("#f97316")
+        if score >= 6:
+            return colors.HexColor("#eab308")
+        return colors.HexColor("#00b050")
+
+    def add_heatmap_visual() -> None:
+        chart_image = _heatmap_chart_image(context, temp_files)
+        if chart_image:
+            block: list[Any] = []
+            block.append(ReportImage(str(chart_image), width=210 * mm, height=124 * mm))
+            block.append(Spacer(1, 8))
+            story.append(KeepTogether(block))
+            return
+
+        block: list[Any] = [Paragraph("Mapa de calor visual", section_style)]
+        risks_by_cell: dict[tuple[int, int], list[str]] = {}
+        for risk in context["risks"]:
+            probability = int(float(risk.get("probability") or 0))
+            impact = int(float(risk.get("impact") or 0))
+            if 1 <= probability <= 5 and 1 <= impact <= 5:
+                label = _safe_text(risk.get("code") or risk.get("name"))
+                risks_by_cell.setdefault((probability, impact), []).append(label)
+
+        axis_style = ParagraphStyle("HeatAxis", parent=small_style, fontName="Helvetica-Bold", fontSize=7.4, leading=8.5, textColor=colors.white, alignment=1)
+        cell_style = ParagraphStyle("HeatCell", parent=small_style, fontName="Helvetica-Bold", fontSize=7.4, leading=8.5, textColor=colors.black, alignment=1)
+        empty_style = ParagraphStyle("HeatEmpty", parent=small_style, fontSize=7.4, leading=8.5, textColor=colors.transparent, alignment=1)
+
+        legend = Table(
+            [[
+                p("Bajo", small_style),
+                p("Medio", small_style),
+                p("Alto", small_style),
+                p("Crítico", small_style),
+            ]],
+            colWidths=[24 * mm, 24 * mm, 24 * mm, 24 * mm],
+        )
+        legend.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, 0), colors.HexColor("#00b050")),
+            ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#eab308")),
+            ("BACKGROUND", (2, 0), (2, 0), colors.HexColor("#f97316")),
+            ("BACKGROUND", (3, 0), (3, 0), colors.HexColor("#ef4444")),
+            ("TEXTCOLOR", (0, 0), (0, 0), colors.black),
+            ("TEXTCOLOR", (1, 0), (1, 0), colors.black),
+            ("TEXTCOLOR", (2, 0), (3, 0), colors.white),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.white),
+            ("FONTSIZE", (0, 0), (-1, -1), 7.2),
+        ]))
+        block.append(legend)
+        block.append(Spacer(1, 4))
+
+        data: list[list[Any]] = [[Paragraph("Impacto \\ Probabilidad", axis_style), *[Paragraph(str(i), axis_style) for i in range(1, 6)]]]
+        for impact in range(5, 0, -1):
+            row: list[Any] = [Paragraph(str(impact), axis_style)]
+            for probability in range(1, 6):
+                labels = risks_by_cell.get((probability, impact), [])
+                row.append(Paragraph("<br/>".join(labels[:4]), cell_style) if labels else Paragraph("", empty_style))
+            data.append(row)
+
+        table = Table(data, colWidths=[40 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm, 30 * mm], rowHeights=[11 * mm] + [18 * mm] * 5)
+        style = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#111827")),
+            ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#111827")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.45, colors.white),
+            ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#111827")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ]
+        for row_idx, impact in enumerate(range(5, 0, -1), start=1):
+            for col_idx, probability in enumerate(range(1, 6), start=1):
+                fill = heat_color(probability, impact)
+                style.append(("BACKGROUND", (col_idx, row_idx), (col_idx, row_idx), fill))
+        table.setStyle(TableStyle(style))
+        block.append(table)
+        block.append(Spacer(1, 8))
+        story.append(KeepTogether(block))
+
+    def add_cronograma_visual() -> None:
+        story.append(Paragraph("Cronograma visual del proyecto", section_style))
+        phases = context["cronograma_phases"]
+        data: list[list[Any]] = [[p("Actividades", small_style), *[p(period, small_style) for period in range(1, 13)]]]
+        for phase in phases:
+            activity = [
+                Paragraph(
+                    f"<b>{xml_escape(_safe_text(phase.get('phase')))}</b><br/>{xml_escape(', '.join(phase.get('risks', [])))}<br/><font color='#64748b'>{xml_escape(_safe_text(phase.get('control')))}</font>",
+                    small_style,
+                )
+            ]
+            start = int(phase.get("start_period") or 0)
+            end = int(phase.get("end_period") or start)
+            for period in range(1, 13):
+                activity.append(p("●" if start <= period <= end else "", small_style))
+            data.append(activity)
+
+        col_widths = [78 * mm] + [13.5 * mm] * 12
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        style = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0a0df")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.45, colors.black),
+            ("FONTSIZE", (0, 0), (-1, -1), 6.6),
+            ("LEFTPADDING", (0, 1), (0, -1), 5),
+            ("RIGHTPADDING", (0, 1), (0, -1), 5),
+            ("TOPPADDING", (0, 1), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+        ]
+        for row_idx, phase in enumerate(phases, start=1):
+            start = int(phase.get("start_period") or 0)
+            end = int(phase.get("end_period") or start)
+            for period in range(1, 13):
+                if start <= period <= end:
+                    style.append(("BACKGROUND", (period, row_idx), (period, row_idx), colors.HexColor("#f5e86d")))
+                    style.append(("TEXTCOLOR", (period, row_idx), (period, row_idx), colors.HexColor("#f5e86d")))
+        table.setStyle(TableStyle(style))
+        story.append(table)
+        story.append(Spacer(1, 8))
+
     add_table("Entregables", ["Entregable"], [[item.get("deliverable")] for item in context["deliverables"]], [245 * mm])
     add_table("Roles", ["Rol", "Adquisición", "Participación en riesgos"], [[item.get("role"), item.get("acquisition_type"), item.get("risk_participation")] for item in context["roles"]], [62 * mm, 38 * mm, 95 * mm])
     add_table("Activos", ["Activo", "Tipo de activo", "Valor"], [[item.get("name"), item.get("type"), item.get("value")] for item in context["assets"]], [78 * mm, 65 * mm, 52 * mm])
@@ -576,7 +851,9 @@ def _build_project_pdf_clean(context: dict[str, Any]) -> bytes:
     add_table("Salvaguardas", ["Amenaza", "Salvaguarda"], [[item.get("threat_name") or item.get("threat_code"), item.get("safeguard")] for item in context["safeguards"]], [55 * mm, 140 * mm])
     add_table("Riesgos", ["Código", "Riesgo", "Activo", "P", "I", "Nivel", "Estado"], [[item.get("code"), item.get("name"), item.get("asset_name"), item.get("probability"), item.get("impact"), item.get("level"), item.get("status")] for item in context["risks"]], [22 * mm, 68 * mm, 52 * mm, 12 * mm, 12 * mm, 20 * mm, 22 * mm])
 
-    story.append(Paragraph("Matriz de riesgos", section_style))
+    add_heatmap_visual()
+
+    matrix_block: list[Any] = [Paragraph("Matriz de riesgos", section_style)]
     matrix_data = [[p("Riesgo"), p("Activo afectado"), p("P"), p("I"), p("Nivel"), p("Prioridad")]]
     for row in context["matrix_rows"]:
         risk = row["risk"]
@@ -603,23 +880,25 @@ def _build_project_pdf_clean(context: dict[str, Any]) -> bytes:
         matrix_style.append(("BACKGROUND", (4, idx), (5, idx), fill))
         matrix_style.append(("TEXTCOLOR", (4, idx), (5, idx), colors.white))
     matrix_table.setStyle(TableStyle(matrix_style))
-    story.append(matrix_table)
-    story.append(Spacer(1, 8))
+    matrix_block.append(matrix_table)
+    matrix_block.append(Spacer(1, 8))
+    story.append(KeepTogether(matrix_block))
 
-    story.append(Paragraph("Cronograma visual", section_style))
-    timeline = context["cronograma_phases"]
-    timeline_table = Table([[p(phase["phase"], small_style) for phase in timeline]], colWidths=[34 * mm] * len(timeline))
-    timeline_table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#94a3b8")), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
-    story.append(timeline_table)
-    story.append(Table([[p(", ".join(phase["risks"]), small_style) for phase in timeline]], colWidths=[34 * mm] * len(timeline)))
-    story.append(Table([[p(phase["control"], small_style) for phase in timeline]], colWidths=[34 * mm] * len(timeline)))
-    story.append(Spacer(1, 6))
+    story.append(PageBreak())
+    add_cronograma_visual()
 
     add_table("Mitigaciones", ["Riesgo", "Acción preventiva", "Acción correctiva / contingencia", "Disparador"], [[item.get("risk_name") or item.get("risk_label"), item.get("preventive_action"), item.get("corrective_action"), item.get("trigger")] for item in context["mitigations"]], [35 * mm, 70 * mm, 70 * mm, 55 * mm])
 
-    doc.build(story)
-    pdf_bytes = buffer.getvalue()
-    buffer.close()
+    try:
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+    finally:
+        buffer.close()
+        for temp_file in temp_files:
+            try:
+                temp_file.unlink(missing_ok=True)
+            except OSError:
+                pass
     return pdf_bytes
 
 
