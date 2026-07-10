@@ -5,37 +5,81 @@
   .timeline-wrap {
     overflow-x: auto;
   }
-  .timeline-grid {
-    min-width: 1180px;
+  .schedule-board {
+    min-width: 1120px;
+    border: 1px solid rgba(15, 23, 42, 0.18);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  }
+  .schedule-title {
+    background: linear-gradient(135deg, #f7b6e8 0%, #f0a0df 100%);
+    color: #111827;
+    font-size: clamp(1.6rem, 3.4vw, 3rem);
+    font-weight: 700;
+    text-align: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 2px solid rgba(15, 23, 42, 0.22);
+  }
+  .schedule-grid {
     display: grid;
-    grid-template-columns: repeat(7, minmax(150px, 1fr));
-    gap: 0.85rem;
+    grid-template-columns: minmax(330px, 2.35fr) repeat(12, minmax(58px, 1fr));
   }
-  .timeline-card {
-    min-height: 100%;
-    border: 1px solid rgba(15, 23, 42, 0.12);
-    border-radius: 1rem;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-  }
-  .timeline-card .card-head {
-    padding: 0.9rem 0.9rem 0.7rem;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  }
-  .timeline-card .card-body {
-    padding: 0.8rem 0.9rem 1rem;
-  }
-  .timeline-id {
-    display: inline-flex;
+  .schedule-cell {
+    min-height: 72px;
+    border-right: 1px solid rgba(15, 23, 42, 0.2);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.2);
+    display: flex;
     align-items: center;
+    padding: 0.65rem 0.75rem;
+  }
+  .schedule-head {
     justify-content: center;
-    min-width: 3rem;
-    padding: 0.25rem 0.55rem;
-    border-radius: 999px;
+    min-height: 56px;
+    background: #f0a0df;
+    color: #111827;
+    font-weight: 700;
+    text-align: center;
+  }
+  .schedule-activity-head {
+    letter-spacing: 0.5rem;
+    text-transform: uppercase;
+  }
+  .schedule-activity {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.4rem;
+    background: #ffffff;
+  }
+  .schedule-period {
+    justify-content: center;
+    background: #ffffff;
+    padding: 0.45rem;
+  }
+  .schedule-bar {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 0.45rem;
+    background: linear-gradient(135deg, #fff7a8 0%, #f5e86d 100%);
+    border: 1px solid rgba(161, 135, 0, 0.3);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 8px 16px rgba(161, 135, 0, 0.12);
+  }
+  .schedule-risk {
     background: #1f4e78;
     color: #fff;
-    font-size: 0.8rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
     font-weight: 700;
+    padding: 0.18rem 0.45rem;
+  }
+  .schedule-control {
+    color: #64748b;
+    font-size: 0.8rem;
+    line-height: 1.25;
+  }
+  .schedule-cell:nth-child(13n) {
+    border-right: 0;
   }
 </style>
 {% endblock %}
@@ -81,33 +125,34 @@
           </div>
           <div class="tab-pane fade" id="visual-pane" role="tabpanel" aria-labelledby="visual-tab">
             <div class="timeline-wrap pb-2">
-              <div class="timeline-grid">
+              <div class="schedule-board">
+                <div class="schedule-title">Cronograma de actividades</div>
+                <div class="schedule-grid">
+                  <div class="schedule-cell schedule-head schedule-activity-head">Actividades</div>
+                  {% for period in range(1, 13) %}
+                    <div class="schedule-cell schedule-head">{{ period }}</div>
+                  {% endfor %}
                 {% for phase in cronograma_phases %}
-                  <div class="timeline-card">
-                    <div class="card-head">
-                      <div class="d-flex align-items-start justify-content-between gap-2">
-                        <div>
-                          <div class="text-secondary small text-uppercase fw-semibold mb-1">Fase {{ loop.index }}</div>
-                          <div class="fw-semibold">{{ phase.phase }}</div>
-                        </div>
-                        <span class="timeline-id">F{{ loop.index }}</span>
-                      </div>
+                  <div class="schedule-cell schedule-activity">
+                    <div class="fw-semibold">{{ phase.phase }}</div>
+                    <div class="d-flex flex-wrap gap-1">
+                      {% for risk_id in phase.risks %}
+                        <span class="schedule-risk">{{ risk_id }}</span>
+                      {% endfor %}
                     </div>
-                    <div class="card-body">
-                      <div class="text-secondary small text-uppercase fw-semibold mb-2">Riesgos</div>
-                      <div class="d-flex flex-wrap gap-1 mb-3">
-                        {% for risk_id in phase.risks %}
-                          <span class="badge text-bg-primary">{{ risk_id }}</span>
-                        {% endfor %}
-                      </div>
-                      <div class="text-secondary small text-uppercase fw-semibold mb-1">Control</div>
-                      <p class="mb-0 small">{{ phase.control }}</p>
-                    </div>
+                    <div class="schedule-control">{{ phase.control }}</div>
                   </div>
+                  {% for period in range(1, 13) %}
+                    <div class="schedule-cell schedule-period">
+                      {% if period >= phase.start_period and period <= phase.end_period %}
+                        <div class="schedule-bar" title="{{ phase.phase }} · periodo {{ period }}"></div>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
                 {% endfor %}
+                </div>
               </div>
             </div>
-            <p class="text-secondary small mt-3 mb-0">El cronograma visual resume las fases en orden horizontal para lectura rápida del avance y su relación con los riesgos.</p>
           </div>
         </div>
       </div>
